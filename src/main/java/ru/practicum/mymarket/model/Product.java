@@ -1,11 +1,6 @@
 package ru.practicum.mymarket.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 
 @Entity
 @Table(name = "products")
@@ -26,6 +21,9 @@ public class Product {
     @Column(nullable = false)
     private long price;
 
+    @Column(name = "external_id", unique = true)
+    private String externalId;
+
     public Product() {
     }
 
@@ -34,6 +32,11 @@ public class Product {
         this.description = description;
         this.imgPath = imgPath;
         this.price = price;
+    }
+
+    public Product(String title, String description, String imgPath, long price, String externalId) {
+        this(title, description, imgPath, price);
+        this.externalId = externalId;
     }
 
     public Long getId() {
@@ -70,5 +73,13 @@ public class Product {
 
     public void setPrice(long price) {
         this.price = price;
+    }
+
+    public String getExternalId() {
+        return externalId;
+    }
+
+    public void setExternalId(String externalId) {
+        this.externalId = externalId;
     }
 }
