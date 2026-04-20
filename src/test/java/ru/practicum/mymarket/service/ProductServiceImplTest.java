@@ -4,9 +4,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import ru.practicum.mymarket.dto.ItemDto;
+import ru.practicum.mymarket.dto.ProductsPageDto;
+import ru.practicum.mymarket.dto.enums.SortMode;
 import ru.practicum.mymarket.model.Product;
 import ru.practicum.mymarket.repository.ProductRepository;
 
@@ -17,6 +24,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,6 +35,9 @@ class ProductServiceImplTest {
 
     @InjectMocks
     private ProductServiceImpl productService;
+
+    @Captor
+    private ArgumentCaptor<Pageable> pageableCaptor;
 
     @Test
     void loadProductsFromCsv_parsesAndFiltersCorrectly(@TempDir Path tempDir) throws IOException {
@@ -77,5 +88,129 @@ class ProductServiceImplTest {
         productService.loadProductsFromCsv(missing);
 
         verify(productRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void getProducts_blankSearch_delegatesToFindAll() {
+        when(productRepository.findAll(any(Pageable.class))).thenReturn(Page.empty());
+
+        productService.getProducts("", SortMode.NO, 1, 5);
+
+        verify(productRepository, never()).searchByTitleOrDescription(anyString(), any());
+    }
+
+    @Test
+    void getProducts_nullSearch_delegatesToFindAll() {
+        when(productRepository.findAll(any(Pageable.class))).thenReturn(Page.empty());
+
+        productService.getProducts(null, SortMode.NO, 1, 5);
+
+        verify(productRepository, never()).searchByTitleOrDescription(anyString(), any());
+    }
+
+    @Test
+    void getProducts_nonBlankSearch_delegatesToSearchQuery() {
+        when(productRepository.searchByTitleOrDescription(eq("widget"), any(Pageable.class)))
+                .thenReturn(Page.empty());
+
+        productService.getProducts("  widget  ", SortMode.NO, 1, 5);
+
+        verify(productRepository, never()).findAll(any(Pageable.class));
+    }
+
+    @Test
+    void getProducts_pageNumberAndSizeAreCorrect() {
+        when(productRepository.findAll(any(Pageable.class))).thenReturn(Page.empty());
+
+        productService.getProducts("", SortMode.NO, 1, 5);
+
+        verify(productRepository).findAll(pageableCaptor.capture());
+        Pageable pageable = pageableCaptor.getValue();
+        assertThat(pageable.getPageNumber()).isEqualTo(0);
+        assertThat(pageable.getPageSize()).isEqualTo(5);
+    }
+
+    @Test
+    void getProducts_sortNo_sortsByIdAsc() {
+        when(productRepository.findAll(any(Pageable.class))).thenReturn(Page.empty());
+
+        productService.getProducts("", SortMode.NO, 1, 5);
+
+        verify(productRepository).findAll(pageableCaptor.capture());
+        Sort sort = pageableCaptor.getValue().getSort();
+        Sort.Order id = sort.getOrderFor("id");
+        assertThat(id).isNotNull();
+        assertThat(id.getDirection()).isEqualTo(Sort.Direction.ASC);
+    }
+
+    @Test
+    void getProducts_sortAlpha_sortsByTitleIgnoreCaseThenId() {
+        when(productRepository.findAll(any(Pageable.class))).thenReturn(Page.empty());
+
+        productService.getProducts("", SortMode.ALPHA, 1, 5);
+
+        verify(productRepository).findAll(pageableCaptor.capture());
+        Sort sort = pageableCaptor.getValue().getSort();
+        Sort.Order title = sort.getOrderFor("title");
+        Sort.Order id = sort.getOrderFor("id");
+        assertThat(title).isNotNull();
+        assertThat(title.getDirection()).isEqualTo(Sort.Direction.ASC);
+        assertThat(title.isIgnoreCase()).isTrue();
+        assertThat(id).isNotNull();
+        assertThat(id.getDirection()).isEqualTo(Sort.Direction.ASC);
+    }
+
+    @Test
+    void getProducts_sortPrice_sortsByPriceThenId() {
+        when(productRepository.findAll(any(Pageable.class))).thenReturn(Page.empty());
+
+        productService.getProducts("", SortMode.PRICE, 1, 5);
+
+        verify(productRepository).findAll(pageableCaptor.capture());
+        Sort sort = pageableCaptor.getValue().getSort();
+        Sort.Order price = sort.getOrderFor("price");
+        Sort.Order id = sort.getOrderFor("id");
+        assertThat(price).isNotNull();
+        assertThat(price.getDirection()).isEqualTo(Sort.Direction.ASC);
+        assertThat(id).isNotNull();
+        assertThat(id.getDirection()).isEqualTo(Sort.Direction.ASC);
+    }
+
+    @Test
+    void getProducts_mapsProductsToItemDTOs(@Mock Page<Product> page) {
+        Product widget = product(10L, "Widget", "A widget", "img/w.jpg", 199L);
+        Product gadget = product(11L, "Gadget", "A gadget", "img/g.jpg", 299L);
+        when(page.getContent()).thenReturn(List.of(widget, gadget));
+        when(page.hasPrevious()).thenReturn(false);
+        when(page.hasNext()).thenReturn(false);
+        when(productRepository.findAll(any(Pageable.class))).thenReturn(page);
+
+        ProductsPageDto result = productService.getProducts("", SortMode.NO, 1, 5);
+
+        assertThat(result.items()).containsExactly(
+                new ItemDto(10L, "Widget", "A widget", "img/w.jpg", 199L, 0),
+                new ItemDto(11L, "Gadget", "A gadget", "img/g.jpg", 299L, 0));
+        assertThat(result.hasPrevious()).isFalse();
+        assertThat(result.hasNext()).isFalse();
+    }
+
+    @Test
+    void getProducts_setsHasPreviousAndHasNextFlags(@Mock Page<Product> page) {
+        when(page.getContent()).thenReturn(List.of());
+        when(page.hasPrevious()).thenReturn(true);
+        when(page.hasNext()).thenReturn(true);
+        when(productRepository.findAll(any(Pageable.class))).thenReturn(page);
+
+        ProductsPageDto result = productService.getProducts("", SortMode.NO, 2, 5);
+
+        assertThat(result.hasPrevious()).isTrue();
+        assertThat(result.hasNext()).isTrue();
+    }
+
+    private static Product product(long id, String title, String description,
+                                   String imgPath, long price) {
+        Product p = new Product(title, description, imgPath, price);
+        p.setId(id);
+        return p;
     }
 }
