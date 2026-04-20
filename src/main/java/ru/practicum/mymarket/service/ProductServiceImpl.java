@@ -3,9 +3,17 @@ package ru.practicum.mymarket.service;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import ru.practicum.mymarket.dto.ItemDto;
+import ru.practicum.mymarket.dto.ProductsPageDto;
+import ru.practicum.mymarket.dto.enums.SortMode;
 import ru.practicum.mymarket.model.Product;
 import ru.practicum.mymarket.repository.ProductRepository;
 
@@ -62,6 +70,39 @@ public class ProductServiceImpl implements ProductService {
             productRepository.saveAll(newProducts);
         }
         log.info("Loaded {} new products", newProducts.size());
+    }
+
+    @Override
+    public ProductsPageDto getProducts(String search, SortMode sort, int pageNumber, int pageSize) {
+        // pageNumber in API is 1-based, need to convert to 0-based for Spring Data
+        Pageable pageable = PageRequest.of(pageNumber - 1, pageSize, toSort(sort));
+        Page<Product> page = StringUtils.isBlank(search)
+                ? productRepository.findAll(pageable)
+                : productRepository.searchByTitleOrDescription(search.trim(), pageable);
+        List<ItemDto> items = page.getContent().stream()
+                .map(this::toItemDto)
+                .toList();
+        return new ProductsPageDto(items, page.hasPrevious(), page.hasNext());
+    }
+
+    private static Sort toSort(SortMode sort) {
+        return switch (sort) {
+            case NO -> Sort.by(Sort.Order.asc("id"));
+            case ALPHA -> Sort.by(Sort.Order.asc("title").ignoreCase())
+                    .and(Sort.by("id").ascending());
+            case PRICE -> Sort.by(Sort.Order.asc("price"))
+                    .and(Sort.by("id").ascending());
+        };
+    }
+
+    private ItemDto toItemDto(Product product) {
+        return new ItemDto(
+                product.getId(),
+                product.getTitle(),
+                product.getDescription(),
+                product.getImgPath(),
+                product.getPrice(),
+                0);
     }
 
     private Product parseRow(CSVRecord record) {
