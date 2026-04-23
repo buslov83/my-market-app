@@ -9,6 +9,7 @@ import ru.practicum.mymarket.dto.ItemDto;
 import ru.practicum.mymarket.dto.PagingDto;
 import ru.practicum.mymarket.dto.ProductsPageDto;
 import ru.practicum.mymarket.dto.enums.SortMode;
+import ru.practicum.mymarket.service.CartService;
 import ru.practicum.mymarket.service.ProductService;
 
 import java.util.List;
@@ -16,8 +17,9 @@ import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = ProductController.class)
@@ -28,6 +30,9 @@ class ProductControllerTest {
 
     @MockitoBean
     private ProductService productService;
+
+    @MockitoBean
+    private CartService cartService;
 
     @Test
     void getRoot_rendersItemsViewWithDefaultParams() throws Exception {
@@ -103,5 +108,82 @@ class ProductControllerTest {
                         List.of(i1, i2, i3),
                         List.of(i4, ItemDto.placeholder(), ItemDto.placeholder())
                 )));
+    }
+
+    @Test
+    void postItems_plusAction_incrementsCartAndRedirects() throws Exception {
+        mockMvc.perform(post("/items")
+                        .param("id", "42")
+                        .param("action", "PLUS"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/items"));
+
+        verify(cartService).plus(42L);
+        verifyNoMoreInteractions(cartService);
+    }
+
+    @Test
+    void postItems_minusAction_decrementsCart() throws Exception {
+        mockMvc.perform(post("/items")
+                        .param("id", "42")
+                        .param("action", "MINUS"))
+                .andExpect(status().is3xxRedirection());
+
+        verify(cartService).minus(42L);
+        verifyNoMoreInteractions(cartService);
+    }
+
+    @Test
+    void postItems_redirectEchoesQueryParams() throws Exception {
+        mockMvc.perform(post("/items")
+                        .param("id", "7")
+                        .param("action", "PLUS")
+                        .param("search", "widget")
+                        .param("sort", "")
+                        .param("pageNumber", "3")
+                        .param("pageSize", "10"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/items?search=widget&sort=&pageNumber=3&pageSize=10"));
+    }
+
+    @Test
+    void postProduct_plusAction_incrementsCartAndRendersItemView() throws Exception {
+        ItemDto dto = new ItemDto(1L, "Widget", "A widget", "img/w.jpg", 199L, 1);
+        when(productService.getProduct(1L)).thenReturn(Optional.of(dto));
+
+        mockMvc.perform(post("/items/1")
+                        .param("action", "PLUS"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("item"))
+                .andExpect(model().attribute("item", dto));
+
+        verify(cartService).plus(1L);
+        verifyNoMoreInteractions(cartService);
+    }
+
+    @Test
+    void postProduct_minusAction_decrementsCart() throws Exception {
+        ItemDto dto = new ItemDto(1L, "Widget", "A widget", "img/w.jpg", 199L, 0);
+        when(productService.getProduct(1L)).thenReturn(Optional.of(dto));
+
+        mockMvc.perform(post("/items/1")
+                        .param("action", "MINUS"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("item"));
+
+        verify(cartService).minus(1L);
+        verifyNoMoreInteractions(cartService);
+    }
+
+    @Test
+    void postProduct_notFound_returns404() throws Exception {
+        when(productService.getProduct(999L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/items/999")
+                        .param("action", "PLUS"))
+                .andExpect(status().isNotFound());
+
+        verify(cartService).plus(999L);
+        verifyNoMoreInteractions(cartService);
     }
 }

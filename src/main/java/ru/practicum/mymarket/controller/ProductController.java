@@ -3,6 +3,7 @@ package ru.practicum.mymarket.controller;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,14 +41,11 @@ public class ProductController {
             @RequestParam(defaultValue = "1") int pageNumber,
             @RequestParam(defaultValue = "5") int pageSize,
             Model model) {
-
         ProductsPageDto page = productService.getProducts(search, sort, pageNumber, pageSize);
-
         model.addAttribute("items", chunkIntoRowsOfThree(page.items()));
         model.addAttribute("search", search);
         model.addAttribute("sort", sort.name());
-        model.addAttribute("paging", new PagingDto(pageSize, pageNumber,
-                page.hasPrevious(), page.hasNext()));
+        model.addAttribute("paging", new PagingDto(pageSize, pageNumber, page.hasPrevious(), page.hasNext()));
         return "items";
     }
 
@@ -55,22 +53,15 @@ public class ProductController {
     public String updateCartFromShowcase(
             @RequestParam long id,
             @RequestParam CartAction action,
-            @RequestParam(defaultValue = "") String search,
-            @RequestParam(defaultValue = "NO") SortMode sort,
-            @RequestParam(defaultValue = "1") int pageNumber,
-            @RequestParam(defaultValue = "5") int pageSize) {
-
+            @RequestParam MultiValueMap<String, String> allParams) {
         applyCartAction(id, action);
-
-        String uri = UriComponentsBuilder.fromPath("/items")
-                .queryParam("search", search)
-                .queryParam("sort", sort.name())
-                .queryParam("pageNumber", pageNumber)
-                .queryParam("pageSize", pageSize)
+        allParams.remove("id");
+        allParams.remove("action");
+        return "redirect:" + UriComponentsBuilder.fromPath("/items")
+                .queryParams(allParams)
                 .build()
                 .encode()
                 .toUriString();
-        return "redirect:" + uri;
     }
 
     @GetMapping("/items/{id}")
@@ -86,9 +77,7 @@ public class ProductController {
             @PathVariable long id,
             @RequestParam CartAction action,
             Model model) {
-
         applyCartAction(id, action);
-
         ItemDto item = productService.getProduct(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         model.addAttribute("item", item);
@@ -108,7 +97,7 @@ public class ProductController {
         for (int i = 0; i < items.size(); i += ROW_SIZE) {
             rows.add(new ArrayList<>(items.subList(i, Math.min(i + ROW_SIZE, items.size()))));
         }
-        // pad the last row with placeholders if it's not full
+        // fill the last row with placeholders to ROW_SIZE
         if (!rows.isEmpty() && rows.getLast().size() < ROW_SIZE) {
             List<ItemDto> lastRow = rows.getLast();
             while (lastRow.size() < ROW_SIZE) {
