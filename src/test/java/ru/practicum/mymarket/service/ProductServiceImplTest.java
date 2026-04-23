@@ -34,6 +34,9 @@ class ProductServiceImplTest {
     @Mock
     private ProductRepository productRepository;
 
+    @Mock
+    private CartService cartService;
+
     @InjectMocks
     private ProductServiceImpl productService;
 
@@ -185,13 +188,14 @@ class ProductServiceImplTest {
         when(page.hasPrevious()).thenReturn(false);
         when(page.hasNext()).thenReturn(false);
         when(productRepository.findAll(any(Pageable.class))).thenReturn(page);
+        when(cartService.quantity(10L)).thenReturn(2);
+        when(cartService.quantity(11L)).thenReturn(0);
 
         ProductsPageDto result = productService.getProducts("", SortMode.NO, 1, 5);
 
         assertThat(result.items()).containsExactly(
-                new ItemDto(10L, "Widget", "A widget", "img/w.jpg", 199L, 0),
+                new ItemDto(10L, "Widget", "A widget", "img/w.jpg", 199L, 2),
                 new ItemDto(11L, "Gadget", "A gadget", "img/g.jpg", 299L, 0));
-        // TODO Verify count is set correctly when we add cart management
         assertThat(result.hasPrevious()).isFalse();
         assertThat(result.hasNext()).isFalse();
     }
@@ -213,6 +217,7 @@ class ProductServiceImplTest {
     void getProduct_whenExists_returnsItemDto() {
         Product widget = product(42L, "Widget", "A widget", "img/w.jpg", 199L);
         when(productRepository.findById(42L)).thenReturn(Optional.of(widget));
+        when(cartService.quantity(42L)).thenReturn(3);
 
         Optional<ItemDto> result = productService.getProduct(42L);
 
@@ -223,7 +228,7 @@ class ProductServiceImplTest {
         assertThat(dto.description()).isEqualTo("A widget");
         assertThat(dto.imgPath()).isEqualTo("img/w.jpg");
         assertThat(dto.price()).isEqualTo(199L);
-        // TODO Verify count is set correctly when we add cart management
+        assertThat(dto.count()).isEqualTo(3);
     }
 
     @Test

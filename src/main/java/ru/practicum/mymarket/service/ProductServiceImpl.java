@@ -28,9 +28,11 @@ public class ProductServiceImpl implements ProductService {
     private static final Logger log = LoggerFactory.getLogger(ProductServiceImpl.class);
 
     private final ProductRepository productRepository;
+    private final CartService cartService;
 
-    public ProductServiceImpl(ProductRepository productRepository) {
+    public ProductServiceImpl(ProductRepository productRepository, CartService cartService) {
         this.productRepository = productRepository;
+        this.cartService = cartService;
     }
 
     @Override
@@ -104,7 +106,7 @@ public class ProductServiceImpl implements ProductService {
                 product.getDescription(),
                 product.getImgPath(),
                 product.getPrice(),
-                0);
+                cartService.quantity(product.getId()));
     }
 
     private Product parseRow(CSVRecord record) {
