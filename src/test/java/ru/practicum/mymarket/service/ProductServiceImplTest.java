@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -190,6 +191,7 @@ class ProductServiceImplTest {
         assertThat(result.items()).containsExactly(
                 new ItemDto(10L, "Widget", "A widget", "img/w.jpg", 199L, 0),
                 new ItemDto(11L, "Gadget", "A gadget", "img/g.jpg", 299L, 0));
+        // TODO Verify count is set correctly when we add cart management
         assertThat(result.hasPrevious()).isFalse();
         assertThat(result.hasNext()).isFalse();
     }
@@ -205,6 +207,32 @@ class ProductServiceImplTest {
 
         assertThat(result.hasPrevious()).isTrue();
         assertThat(result.hasNext()).isTrue();
+    }
+
+    @Test
+    void getProduct_whenExists_returnsItemDto() {
+        Product widget = product(42L, "Widget", "A widget", "img/w.jpg", 199L);
+        when(productRepository.findById(42L)).thenReturn(Optional.of(widget));
+
+        Optional<ItemDto> result = productService.getProduct(42L);
+
+        assertThat(result).isPresent();
+        ItemDto dto = result.get();
+        assertThat(dto.id()).isEqualTo(42L);
+        assertThat(dto.title()).isEqualTo("Widget");
+        assertThat(dto.description()).isEqualTo("A widget");
+        assertThat(dto.imgPath()).isEqualTo("img/w.jpg");
+        assertThat(dto.price()).isEqualTo(199L);
+        // TODO Verify count is set correctly when we add cart management
+    }
+
+    @Test
+    void getProduct_whenNotExists_returnsEmpty() {
+        when(productRepository.findById(99L)).thenReturn(Optional.empty());
+
+        Optional<ItemDto> result = productService.getProduct(99L);
+
+        assertThat(result).isEmpty();
     }
 
     private static Product product(long id, String title, String description,

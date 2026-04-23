@@ -20,10 +20,7 @@ import ru.practicum.mymarket.repository.ProductRepository;
 import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 @Service
 public class ProductServiceImpl implements ProductService {
@@ -83,6 +80,11 @@ public class ProductServiceImpl implements ProductService {
                 .map(this::toItemDto)
                 .toList();
         return new ProductsPageDto(items, page.hasPrevious(), page.hasNext());
+    }
+
+    @Override
+    public Optional<ItemDto> getProduct(long id) {
+        return productRepository.findById(id).map(this::toItemDto);
     }
 
     private static Sort toSort(SortMode sort) {
