@@ -31,6 +31,10 @@ public class Cart {
         }
     }
 
+    public synchronized void delete(long productId) {
+        quantityByProductId.remove(productId);
+    }
+
     public synchronized int quantity(long productId) {
         return quantityByProductId.getOrDefault(productId, 0);
     }

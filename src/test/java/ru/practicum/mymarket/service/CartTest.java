@@ -45,6 +45,7 @@ class CartTest {
         cart.minus(1L);
 
         assertThat(cart.quantity(1L)).isEqualTo(0);
+        assertThat(cart.entries()).doesNotContainKey(1L);
     }
 
     @Test
@@ -56,6 +57,28 @@ class CartTest {
         cart.minus(1L);
 
         assertThat(cart.quantity(1L)).isEqualTo(1);
+    }
+
+    @Test
+    void delete_whenAbsent_isNoOp() {
+        Cart cart = new Cart();
+
+        cart.delete(1L);
+
+        assertThat(cart.quantity(1L)).isEqualTo(0);
+    }
+
+    @Test
+    void delete_removesEntry() {
+        Cart cart = new Cart();
+        cart.plus(1L);
+        cart.plus(1L);
+        cart.plus(1L);
+
+        cart.delete(1L);
+
+        assertThat(cart.quantity(1L)).isEqualTo(0);
+        assertThat(cart.entries()).doesNotContainKey(1L);
     }
 
     @Test
