@@ -1,5 +1,7 @@
 package ru.practicum.mymarket.service;
 
+import ru.practicum.mymarket.dto.CartDto;
+
 public interface CartService {
 
     void plus(long productId);
@@ -7,4 +9,6 @@ public interface CartService {
     void minus(long productId);
 
     int quantity(long productId);
+
+    CartDto getCart();
 }

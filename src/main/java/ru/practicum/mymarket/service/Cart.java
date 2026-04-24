@@ -5,6 +5,7 @@ import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -32,5 +33,9 @@ public class Cart {
 
     public synchronized int quantity(long productId) {
         return quantityByProductId.getOrDefault(productId, 0);
+    }
+
+    public synchronized Map<Long, Integer> entries() {
+        return Collections.unmodifiableMap(new LinkedHashMap<>(quantityByProductId));
     }
 }
