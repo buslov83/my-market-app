@@ -8,7 +8,5 @@ public record ItemDto(
         long price,
         int count
 ) {
-    public static ItemDto placeholder() {
-        return new ItemDto(-1L, "", "", "", 0L, 0);
-    }
+    public static final ItemDto PLACEHOLDER = new ItemDto(-1L, "", "", "", 0L, 0);
 }

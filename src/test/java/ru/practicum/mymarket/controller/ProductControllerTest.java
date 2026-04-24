@@ -106,7 +106,7 @@ class ProductControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("items", List.of(
                         List.of(i1, i2, i3),
-                        List.of(i4, ItemDto.placeholder(), ItemDto.placeholder())
+                        List.of(i4, ItemDto.PLACEHOLDER, ItemDto.PLACEHOLDER)
                 )));
     }
 

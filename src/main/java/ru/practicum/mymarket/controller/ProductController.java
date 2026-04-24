@@ -101,7 +101,7 @@ public class ProductController {
         if (!rows.isEmpty() && rows.getLast().size() < ROW_SIZE) {
             List<ItemDto> lastRow = rows.getLast();
             while (lastRow.size() < ROW_SIZE) {
-                lastRow.add(ItemDto.placeholder());
+                lastRow.add(ItemDto.PLACEHOLDER);
             }
         }
         return rows;
