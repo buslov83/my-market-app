@@ -6,6 +6,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Sort;
 import ru.practicum.mymarket.dto.ItemDto;
 import ru.practicum.mymarket.dto.OrderDto;
 import ru.practicum.mymarket.model.Order;
@@ -95,5 +96,40 @@ class OrderServiceImplTest {
         when(orderRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThat(orderService.getOrder(99L)).isEmpty();
+    }
+
+    @Test
+    void getOrders_mapsEachOrderToDtoInRepositoryOrder() {
+        Order first = new Order();
+        first.setId(1L);
+        first.addItem(new OrderItem(1L, "Apple", 100L, 2));
+        Order second = new Order();
+        second.setId(2L);
+        second.addItem(new OrderItem(3L, "Carrot", 50L, 1));
+        second.addItem(new OrderItem(2L, "Bread", 200L, 3));
+        when(orderRepository.findAll(Sort.by(Sort.Order.asc("id")))).thenReturn(List.of(first, second));
+
+        List<OrderDto> dtos = orderService.getOrders();
+
+        assertThat(dtos).hasSize(2);
+        assertThat(dtos.get(0).id()).isEqualTo(1L);
+        assertThat(dtos.get(0).items())
+                .extracting(ItemDto::id, ItemDto::title, ItemDto::price, ItemDto::count)
+                .containsExactly(tuple(1L, "Apple", 100L, 2));
+        assertThat(dtos.get(0).totalSum()).isEqualTo(200L);
+        assertThat(dtos.get(1).id()).isEqualTo(2L);
+        assertThat(dtos.get(1).items())
+                .extracting(ItemDto::id, ItemDto::title, ItemDto::price, ItemDto::count)
+                .containsExactly(
+                        tuple(3L, "Carrot", 50L, 1),
+                        tuple(2L, "Bread", 200L, 3));
+        assertThat(dtos.get(1).totalSum()).isEqualTo(50L + 200L * 3);
+    }
+
+    @Test
+    void getOrders_whenNoOrders_returnsEmptyList() {
+        when(orderRepository.findAll(Sort.by(Sort.Order.asc("id")))).thenReturn(List.of());
+
+        assertThat(orderService.getOrders()).isEmpty();
     }
 }

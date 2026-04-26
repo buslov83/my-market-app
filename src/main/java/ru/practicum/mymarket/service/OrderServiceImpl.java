@@ -1,5 +1,6 @@
 package ru.practicum.mymarket.service;
 
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.mymarket.dto.ItemDto;
@@ -8,6 +9,7 @@ import ru.practicum.mymarket.model.Order;
 import ru.practicum.mymarket.model.OrderItem;
 import ru.practicum.mymarket.repository.OrderRepository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,6 +35,7 @@ public class OrderServiceImpl implements OrderService {
         for (ItemDto item : items) {
             order.addItem(new OrderItem(item.id(), item.title(), item.price(), item.count()));
         }
+        order.setCreatedAt(Instant.now());
         Order saved = orderRepository.save(order);
         cartService.clear();
         return saved.getId();
@@ -41,6 +44,13 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public Optional<OrderDto> getOrder(long id) {
         return orderRepository.findById(id).map(this::toDto);
+    }
+
+    @Override
+    public List<OrderDto> getOrders() {
+        return orderRepository.findAll(Sort.by(Sort.Order.asc("id"))).stream()
+                .map(this::toDto)
+                .toList();
     }
 
     private OrderDto toDto(Order order) {

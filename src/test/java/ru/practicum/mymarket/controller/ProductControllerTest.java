@@ -75,6 +75,23 @@ class ProductControllerTest {
     }
 
     @Test
+    void getItems_chunksItemsIntoRowsOfThree_padsLastRowWithPlaceholders() throws Exception {
+        ItemDto i1 = new ItemDto(1L, "A", "A", "a.jpg", 100L, 1);
+        ItemDto i2 = new ItemDto(2L, "B", "B", "b.jpg", 200L, 2);
+        ItemDto i3 = new ItemDto(3L, "C", "C", "c.jpg", 300L, 3);
+        ItemDto i4 = new ItemDto(4L, "D", "D", "d.jpg", 400L, 4);
+        when(productService.getProducts(any(), any(), anyInt(), anyInt()))
+                .thenReturn(new ProductsPageDto(List.of(i1, i2, i3, i4), false, false));
+
+        mockMvc.perform(get("/items"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("items", List.of(
+                        List.of(i1, i2, i3),
+                        List.of(i4, ItemDto.PLACEHOLDER, ItemDto.PLACEHOLDER)
+                )));
+    }
+
+    @Test
     void getProduct_foundProduct_rendersItemViewWithItemAttribute() throws Exception {
         ItemDto dto = new ItemDto(1L, "Widget", "A widget", "img/w.jpg", 199L, 5);
         when(productService.getProduct(1L)).thenReturn(Optional.of(dto));
@@ -91,23 +108,6 @@ class ProductControllerTest {
 
         mockMvc.perform(get("/items/999"))
                 .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void getItems_chunksItemsIntoRowsOfThree_padsLastRowWithPlaceholders() throws Exception {
-        ItemDto i1 = new ItemDto(1L, "A", "A", "a.jpg", 100L, 1);
-        ItemDto i2 = new ItemDto(2L, "B", "B", "b.jpg", 200L, 2);
-        ItemDto i3 = new ItemDto(3L, "C", "C", "c.jpg", 300L, 3);
-        ItemDto i4 = new ItemDto(4L, "D", "D", "d.jpg", 400L, 4);
-        when(productService.getProducts(any(), any(), anyInt(), anyInt()))
-                .thenReturn(new ProductsPageDto(List.of(i1, i2, i3, i4), false, false));
-
-        mockMvc.perform(get("/items"))
-                .andExpect(status().isOk())
-                .andExpect(model().attribute("items", List.of(
-                        List.of(i1, i2, i3),
-                        List.of(i4, ItemDto.PLACEHOLDER, ItemDto.PLACEHOLDER)
-                )));
     }
 
     @Test

@@ -26,6 +26,12 @@ public class OrderController {
         return "redirect:/orders/" + orderId + "?newOrder=true";
     }
 
+    @GetMapping("/orders")
+    public String getOrders(Model model) {
+        model.addAttribute("orders", orderService.getOrders());
+        return "orders";
+    }
+
     @GetMapping("/orders/{id}")
     public String getOrder(
             @PathVariable long id,

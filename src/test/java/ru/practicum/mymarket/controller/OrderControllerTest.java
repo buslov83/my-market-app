@@ -66,4 +66,26 @@ class OrderControllerTest {
         mockMvc.perform(get("/orders/99"))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void getOrders_rendersOrdersViewWithList() throws Exception {
+        OrderDto first = new OrderDto(1L, List.of(new ItemDto(1L, "Apple", "", "", 100L, 2)), 200L);
+        OrderDto second = new OrderDto(2L, List.of(new ItemDto(3L, "Carrot", "", "", 50L, 1)), 50L);
+        when(orderService.getOrders()).thenReturn(List.of(first, second));
+
+        mockMvc.perform(get("/orders"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("orders"))
+                .andExpect(model().attribute("orders", List.of(first, second)));
+    }
+
+    @Test
+    void getOrders_whenNoOrders_rendersEmptyList() throws Exception {
+        when(orderService.getOrders()).thenReturn(List.of());
+
+        mockMvc.perform(get("/orders"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("orders"))
+                .andExpect(model().attribute("orders", List.of()));
+    }
 }
