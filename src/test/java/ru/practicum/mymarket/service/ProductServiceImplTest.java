@@ -235,9 +235,7 @@ class ProductServiceImplTest {
     void getProduct_whenNotExists_returnsEmpty() {
         when(productRepository.findById(99L)).thenReturn(Optional.empty());
 
-        Optional<ItemDto> result = productService.getProduct(99L);
-
-        assertThat(result).isEmpty();
+        assertThat(productService.getProduct(99L)).isEmpty();
     }
 
     private static Product product(long id, String title, String description,

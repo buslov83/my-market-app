@@ -77,10 +77,7 @@ public class CartServiceImpl implements CartService {
     @Override
     public CartDto getCart() {
         List<ItemDto> items = getCartItems();
-        long total = 0L;
-        for (ItemDto item : items) {
-            total += item.price() * item.count();
-        }
+        long total = items.stream().mapToLong(i -> i.price() * i.count()).sum();
         return new CartDto(items, total);
     }
 }

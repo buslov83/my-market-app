@@ -7,11 +7,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.practicum.mymarket.dto.ItemDto;
+import ru.practicum.mymarket.dto.OrderDto;
 import ru.practicum.mymarket.model.Order;
 import ru.practicum.mymarket.model.OrderItem;
 import ru.practicum.mymarket.repository.OrderRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -65,5 +67,33 @@ class OrderServiceImplTest {
 
         verify(orderRepository, never()).save(any(Order.class));
         verify(cartService, never()).clear();
+    }
+
+    @Test
+    void getOrder_whenExists_returnsOrderDto() {
+        Order order = new Order();
+        order.setId(7L);
+        order.addItem(new OrderItem(3L, "Carrot", 50L, 2));
+        order.addItem(new OrderItem(1L, "Apple", 100L, 1));
+        order.addItem(new OrderItem(2L, "Bread", 200L, 4));
+        when(orderRepository.findById(7L)).thenReturn(Optional.of(order));
+
+        OrderDto dto = orderService.getOrder(7L).orElseThrow();
+
+        assertThat(dto.id()).isEqualTo(7L);
+        assertThat(dto.items())
+                .extracting(ItemDto::id, ItemDto::title, ItemDto::price, ItemDto::count)
+                .containsExactly(
+                        tuple(3L, "Carrot", 50L, 2),
+                        tuple(1L, "Apple", 100L, 1),
+                        tuple(2L, "Bread", 200L, 4));
+        assertThat(dto.totalSum()).isEqualTo(50L * 2 + 100L + 200L * 4);
+    }
+
+    @Test
+    void getOrder_whenNotExists_returnsEmpty() {
+        when(orderRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThat(orderService.getOrder(99L)).isEmpty();
     }
 }
