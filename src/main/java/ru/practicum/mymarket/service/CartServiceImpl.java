@@ -49,25 +49,37 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
-    public CartDto getCart() {
+    public void clear() {
+        cart.clear();
+    }
+
+    @Override
+    public List<ItemDto> getCartItems() {
         Map<Long, Integer> cartEntries = cart.entries();
         if (cartEntries.isEmpty()) {
-            return CartDto.EMPTY_CART;
+            return List.of();
         }
         Map<Long, Product> cartProducts = productRepository.findAllById(cartEntries.keySet())
                 .stream()
                 .collect(toMap(Product::getId, Function.identity()));
         List<ItemDto> items = new ArrayList<>(cartEntries.size());
-        long total = 0L;
         for (Map.Entry<Long, Integer> entry : cartEntries.entrySet()) {
             Product product = cartProducts.get(entry.getKey());
             if (product == null) {
                 continue;
             }
-            int count = entry.getValue();
             items.add(new ItemDto(product.getId(), product.getTitle(), product.getDescription(), product.getImgPath(),
-                    product.getPrice(), count));
-            total += product.getPrice() * count;
+                    product.getPrice(), entry.getValue()));
+        }
+        return items;
+    }
+
+    @Override
+    public CartDto getCart() {
+        List<ItemDto> items = getCartItems();
+        long total = 0L;
+        for (ItemDto item : items) {
+            total += item.price() * item.count();
         }
         return new CartDto(items, total);
     }

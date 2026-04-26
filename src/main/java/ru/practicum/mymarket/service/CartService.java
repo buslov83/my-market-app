@@ -1,6 +1,9 @@
 package ru.practicum.mymarket.service;
 
 import ru.practicum.mymarket.dto.CartDto;
+import ru.practicum.mymarket.dto.ItemDto;
+
+import java.util.List;
 
 public interface CartService {
 
@@ -12,5 +15,9 @@ public interface CartService {
 
     int quantity(long productId);
 
+    List<ItemDto> getCartItems();
+
     CartDto getCart();
+
+    void clear();
 }

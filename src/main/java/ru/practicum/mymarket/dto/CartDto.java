@@ -6,5 +6,4 @@ public record CartDto(
         List<ItemDto> items,
         long total
 ) {
-    public static final CartDto EMPTY_CART = new CartDto(List.of(), 0L);
 }

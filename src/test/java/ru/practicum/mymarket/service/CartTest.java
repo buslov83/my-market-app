@@ -126,4 +126,20 @@ class CartTest {
         assertThatThrownBy(() -> snapshot.put(42L, 7))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
+
+    @Test
+    void clear_removesAllEntries() {
+        Cart cart = new Cart();
+        cart.plus(1L);
+        cart.plus(2L);
+        cart.plus(2L);
+        cart.plus(3L);
+
+        cart.clear();
+
+        assertThat(cart.entries()).isEmpty();
+        assertThat(cart.quantity(1L)).isEqualTo(0);
+        assertThat(cart.quantity(2L)).isEqualTo(0);
+        assertThat(cart.quantity(3L)).isEqualTo(0);
+    }
 }

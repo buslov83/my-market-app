@@ -42,4 +42,8 @@ public class Cart {
     public synchronized Map<Long, Integer> entries() {
         return Collections.unmodifiableMap(new LinkedHashMap<>(quantityByProductId));
     }
+
+    public synchronized void clear() {
+        quantityByProductId.clear();
+    }
 }
