@@ -97,7 +97,7 @@ public class ProductController {
         for (int i = 0; i < items.size(); i += ROW_SIZE) {
             rows.add(new ArrayList<>(items.subList(i, Math.min(i + ROW_SIZE, items.size()))));
         }
-        // fill the last row with placeholders to ROW_SIZE
+        // fill the last row with placeholders up to ROW_SIZE
         if (!rows.isEmpty() && rows.getLast().size() < ROW_SIZE) {
             List<ItemDto> lastRow = rows.getLast();
             while (lastRow.size() < ROW_SIZE) {
