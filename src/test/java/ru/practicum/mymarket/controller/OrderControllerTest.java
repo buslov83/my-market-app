@@ -1,13 +1,8 @@
 package ru.practicum.mymarket.controller;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
 import ru.practicum.mymarket.dto.ItemDto;
 import ru.practicum.mymarket.dto.OrderDto;
-import ru.practicum.mymarket.service.OrderService;
 
 import java.util.List;
 import java.util.Optional;
@@ -17,14 +12,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(controllers = OrderController.class)
-class OrderControllerTest {
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @MockitoBean
-    private OrderService orderService;
+class OrderControllerTest extends ControllerWebMvcTestBase {
 
     @Test
     void postBuy_redirectsToNewOrderPage() throws Exception {

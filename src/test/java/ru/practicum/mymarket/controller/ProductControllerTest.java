@@ -1,16 +1,10 @@
 package ru.practicum.mymarket.controller;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
 import ru.practicum.mymarket.dto.ItemDto;
 import ru.practicum.mymarket.dto.PagingDto;
 import ru.practicum.mymarket.dto.ProductsPageDto;
 import ru.practicum.mymarket.dto.enums.SortMode;
-import ru.practicum.mymarket.service.CartService;
-import ru.practicum.mymarket.service.ProductService;
 
 import java.util.List;
 import java.util.Optional;
@@ -22,17 +16,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(controllers = ProductController.class)
-class ProductControllerTest {
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @MockitoBean
-    private ProductService productService;
-
-    @MockitoBean
-    private CartService cartService;
+class ProductControllerTest extends ControllerWebMvcTestBase {
 
     @Test
     void getRoot_rendersItemsViewWithDefaultParams() throws Exception {
