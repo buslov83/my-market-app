@@ -91,11 +91,9 @@ public class ProductServiceImpl implements ProductService {
 
     private static Sort toSort(SortMode sort) {
         return switch (sort) {
-            case NO -> Sort.by(Sort.Order.asc("id"));
-            case ALPHA -> Sort.by(Sort.Order.asc("title").ignoreCase())
-                    .and(Sort.by("id").ascending());
-            case PRICE -> Sort.by(Sort.Order.asc("price"))
-                    .and(Sort.by("id").ascending());
+            case NO -> Sort.by("id").ascending();
+            case ALPHA -> Sort.by(Sort.Order.asc("title").ignoreCase()).and(Sort.by("id").ascending());
+            case PRICE -> Sort.by("price", "id").ascending();
         };
     }
 

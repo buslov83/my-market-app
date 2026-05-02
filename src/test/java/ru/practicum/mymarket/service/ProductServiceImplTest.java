@@ -155,11 +155,12 @@ class ProductServiceImplTest {
 
         verify(productRepository).findAll(pageableCaptor.capture());
         Sort sort = pageableCaptor.getValue().getSort();
+        assertThat(sort).extracting(Sort.Order::getProperty).containsExactly("title", "id");
         Sort.Order title = sort.getOrderFor("title");
-        Sort.Order id = sort.getOrderFor("id");
         assertThat(title).isNotNull();
         assertThat(title.getDirection()).isEqualTo(Sort.Direction.ASC);
         assertThat(title.isIgnoreCase()).isTrue();
+        Sort.Order id = sort.getOrderFor("id");
         assertThat(id).isNotNull();
         assertThat(id.getDirection()).isEqualTo(Sort.Direction.ASC);
     }
@@ -172,10 +173,11 @@ class ProductServiceImplTest {
 
         verify(productRepository).findAll(pageableCaptor.capture());
         Sort sort = pageableCaptor.getValue().getSort();
+        assertThat(sort).extracting(Sort.Order::getProperty).containsExactly("price", "id");
         Sort.Order price = sort.getOrderFor("price");
-        Sort.Order id = sort.getOrderFor("id");
         assertThat(price).isNotNull();
         assertThat(price.getDirection()).isEqualTo(Sort.Direction.ASC);
+        Sort.Order id = sort.getOrderFor("id");
         assertThat(id).isNotNull();
         assertThat(id.getDirection()).isEqualTo(Sort.Direction.ASC);
     }
