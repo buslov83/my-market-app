@@ -9,6 +9,7 @@ A server-side rendered marketplace web application: a product showcase with sear
 - Thymeleaf
 - Spring Data JPA / Hibernate
 - PostgreSQL (runtime), H2 (tests)
+- Liquibase for database migrations
 - Maven (Maven Wrapper included)
 - JUnit 5 / Spring Boot Test
 - Docker, Docker Compose
