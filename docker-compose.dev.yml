@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:17.5
+    environment:
+      POSTGRES_DB: marketdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_dev_data:
