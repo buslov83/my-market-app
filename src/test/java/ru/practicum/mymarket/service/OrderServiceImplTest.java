@@ -6,7 +6,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Sort;
 import ru.practicum.mymarket.dto.ItemDto;
 import ru.practicum.mymarket.dto.OrderDto;
 import ru.practicum.mymarket.model.Order;
@@ -107,7 +106,7 @@ class OrderServiceImplTest {
         second.setId(2L);
         second.addItem(new OrderItem(3L, "Carrot", 50L, 1));
         second.addItem(new OrderItem(2L, "Bread", 200L, 3));
-        when(orderRepository.findAll(Sort.by(Sort.Order.asc("id")))).thenReturn(List.of(first, second));
+        when(orderRepository.findAllWithItems()).thenReturn(List.of(first, second));
 
         List<OrderDto> dtos = orderService.getOrders();
 
@@ -128,7 +127,7 @@ class OrderServiceImplTest {
 
     @Test
     void getOrders_whenNoOrders_returnsEmptyList() {
-        when(orderRepository.findAll(Sort.by(Sort.Order.asc("id")))).thenReturn(List.of());
+        when(orderRepository.findAllWithItems()).thenReturn(List.of());
 
         assertThat(orderService.getOrders()).isEmpty();
     }

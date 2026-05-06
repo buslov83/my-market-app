@@ -1,6 +1,5 @@
 package ru.practicum.mymarket.service;
 
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.mymarket.dto.ItemDto;
@@ -42,13 +41,14 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<OrderDto> getOrder(long id) {
         return orderRepository.findById(id).map(this::toDto);
     }
 
     @Override
     public List<OrderDto> getOrders() {
-        return orderRepository.findAll(Sort.by(Sort.Order.asc("id"))).stream()
+        return orderRepository.findAllWithItems().stream()
                 .map(this::toDto)
                 .toList();
     }
