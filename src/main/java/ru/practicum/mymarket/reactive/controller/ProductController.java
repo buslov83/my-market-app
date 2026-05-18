@@ -1,9 +1,12 @@
 package ru.practicum.mymarket.reactive.controller;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.reactive.result.view.Rendering;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import ru.practicum.mymarket.dto.ItemDto;
 import ru.practicum.mymarket.dto.PagingDto;
@@ -38,6 +41,15 @@ public class ProductController {
                         .modelAttribute("paging",
                                 new PagingDto(pageSize, pageNumber, page.hasPrevious(), page.hasNext()))
                         .build());
+    }
+
+    @GetMapping("/items/{id}")
+    public Mono<Rendering> getProduct(@PathVariable long id) {
+        return productService.getProduct(id)
+                .map(item -> Rendering.view("item")
+                        .modelAttribute("item", item)
+                        .build())
+                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)));
     }
 
     private static List<List<ItemDto>> chunkIntoRowsOfThree(List<ItemDto> items) {

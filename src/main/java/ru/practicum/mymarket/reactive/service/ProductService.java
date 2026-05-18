@@ -12,4 +12,6 @@ public interface ProductService {
     Mono<Long> loadProductsFromCsv(Path csvPath);
 
     Mono<Page<ItemDto>> getProducts(String search, SortMode sort, int pageNumber, int pageSize);
+
+    Mono<ItemDto> getProduct(long id);
 }

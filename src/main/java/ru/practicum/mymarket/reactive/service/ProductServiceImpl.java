@@ -71,6 +71,11 @@ public class ProductServiceImpl implements ProductService {
                 .map(page -> page.map(this::toItemDto));
     }
 
+    @Override
+    public Mono<ItemDto> getProduct(long id) {
+        return productRepository.findById(id).map(this::toItemDto);
+    }
+
     private static Sort toSort(SortMode sort) {
         return switch (sort) {
             case NO -> Sort.by("id").ascending();
