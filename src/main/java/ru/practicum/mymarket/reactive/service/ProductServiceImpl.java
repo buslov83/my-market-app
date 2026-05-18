@@ -91,7 +91,7 @@ public class ProductServiceImpl implements ProductService {
                 product.getDescription(),
                 product.getImgPath(),
                 product.getPrice(),
-                0); // TODO populate count from CartService.quantity(productId) when CartService is migrated
+                0);
     }
 
     private List<Product> parseCsv(Path csvPath, Set<String> excludeIds) {
