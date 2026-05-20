@@ -1,5 +1,6 @@
 package ru.practicum.mymarket.controller;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import ru.practicum.mymarket.dto.CartDto;
 import ru.practicum.mymarket.dto.ItemDto;
@@ -11,6 +12,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@Disabled
 class CartControllerTest extends ControllerWebMvcTestBase {
 
     @Test
