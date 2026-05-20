@@ -14,6 +14,4 @@ public interface ProductService {
     Mono<Page<ItemDto>> getProducts(String search, SortMode sort, int pageNumber, int pageSize);
 
     Mono<ItemDto> getProduct(long id);
-
-    Mono<Boolean> existsById(long id);
 }
