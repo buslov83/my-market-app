@@ -99,8 +99,11 @@ public class ProductController {
 
     private Mono<Void> applyCartAction(long id, CartAction action, WebSession session) {
         return switch (action) {
-            case PLUS -> cartService.plus(id, session);
-            case MINUS -> cartService.minus(id, session);
+            case PLUS -> productService.existsById(id)
+                    .flatMap(exists -> exists
+                            ? Mono.fromRunnable(() -> cartService.plus(id, session))
+                            : Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)));
+            case MINUS -> Mono.fromRunnable(() -> cartService.minus(id, session));
             case DELETE -> Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST));
         };
     }
