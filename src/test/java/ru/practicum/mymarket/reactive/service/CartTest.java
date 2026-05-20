@@ -1,4 +1,4 @@
-package ru.practicum.mymarket.service;
+package ru.practicum.mymarket.reactive.service;
 
 import org.junit.jupiter.api.Test;
 
