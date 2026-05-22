@@ -46,7 +46,7 @@ public class ProductController {
             WebSession session) {
         return productService.getProducts(search, sort, pageNumber, pageSize)
                 .map(page -> Rendering.view("items")
-                        .modelAttribute("items", chunkIntoRowsOfThree(page.getContent().stream()
+                        .modelAttribute("items", chunkIntoRowsOfThree(page.items().stream()
                                 .map(item -> item.withCount(cartService.quantity(item.id(), session)))
                                 .toList()))
                         .modelAttribute("search", search)

@@ -3,18 +3,14 @@ package ru.practicum.mymarket.reactive.service;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.support.ReactivePageableExecutionUtils;
+import org.springframework.data.relational.domain.SqlSort;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import ru.practicum.mymarket.dto.ItemDto;
+import ru.practicum.mymarket.dto.ProductsPageDto;
 import ru.practicum.mymarket.dto.enums.SortMode;
 import ru.practicum.mymarket.reactive.model.Product;
 import ru.practicum.mymarket.reactive.repository.ProductRepository;
@@ -22,10 +18,7 @@ import ru.practicum.mymarket.reactive.repository.ProductRepository;
 import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -49,26 +42,17 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public Mono<Page<ItemDto>> getProducts(String search, SortMode sort, int pageNumber, int pageSize) {
-        // pageNumber in API is 1-based, need to convert to 0-based for Spring Data
-        Pageable pageable = PageRequest.of(pageNumber - 1, pageSize, toSort(sort));
-
-        Flux<Product> contentFlux;
-        Mono<Long> totalMono;
-        if (StringUtils.isBlank(search)) {
-            contentFlux = productRepository.findAllBy(pageable);
-            totalMono = productRepository.count();
-        } else {
-            String searchKey = search.trim();
-            contentFlux = productRepository
-                    .findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(searchKey, searchKey, pageable);
-            totalMono = productRepository
-                    .countByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(searchKey, searchKey);
-        }
-
-        return contentFlux.collectList()
-                .flatMap(content -> ReactivePageableExecutionUtils.getPage(content, pageable, totalMono))
-                .map(page -> page.map(this::toItemDto));
+    public Mono<ProductsPageDto> getProducts(String search, SortMode sort, int pageNumber, int pageSize) {
+        int offset = (pageNumber - 1) * pageSize;
+        search = search != null ? search.trim() : "";
+        return productRepository.findByTitleOrDescription(search, toSort(sort), offset, pageSize + 1)
+                .map(this::toItemDto)
+                .collectList()
+                .map(items -> {
+                    boolean hasNext = items.size() > pageSize;
+                    List<ItemDto> page = hasNext ? items.subList(0, pageSize) : items;
+                    return new ProductsPageDto(page, pageNumber > 1, hasNext);
+                });
     }
 
     @Override
@@ -79,7 +63,8 @@ public class ProductServiceImpl implements ProductService {
     private static Sort toSort(SortMode sort) {
         return switch (sort) {
             case NO -> Sort.by("id").ascending();
-            case ALPHA -> Sort.by(Sort.Order.asc("title").ignoreCase()).and(Sort.by("id").ascending());
+            case ALPHA -> SqlSort.unsafe("LOWER(title)").ascending()
+                    .and(Sort.by("id").ascending());
             case PRICE -> Sort.by("price", "id").ascending();
         };
     }

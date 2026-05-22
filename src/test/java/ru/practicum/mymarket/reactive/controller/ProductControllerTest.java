@@ -1,8 +1,6 @@
 package ru.practicum.mymarket.reactive.controller;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -10,6 +8,7 @@ import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.server.WebSession;
 import reactor.core.publisher.Mono;
 import ru.practicum.mymarket.dto.ItemDto;
+import ru.practicum.mymarket.dto.ProductsPageDto;
 import ru.practicum.mymarket.dto.enums.SortMode;
 
 import java.util.List;
@@ -24,7 +23,7 @@ class ProductControllerTest extends ControllerWebFluxTestBase {
     @Test
     void getRoot_rendersItemsViewWithDefaults() {
         when(productService.getProducts("", SortMode.NO, 1, 5))
-                .thenReturn(Mono.just(new PageImpl<>(List.of())));
+                .thenReturn(Mono.just(new ProductsPageDto(List.of(), false, false)));
 
         webTestClient.get().uri("/")
                 .exchange()
@@ -44,7 +43,7 @@ class ProductControllerTest extends ControllerWebFluxTestBase {
     @Test
     void getItems_rendersItemsView() {
         when(productService.getProducts("", SortMode.NO, 1, 5))
-                .thenReturn(Mono.just(new PageImpl<>(List.of())));
+                .thenReturn(Mono.just(new ProductsPageDto(List.of(), false, false)));
 
         webTestClient.get().uri("/items")
                 .exchange()
@@ -58,7 +57,7 @@ class ProductControllerTest extends ControllerWebFluxTestBase {
         ItemDto i1 = new ItemDto(1L, "A", "A", "a.jpg", 100L, 0);
         ItemDto i2 = new ItemDto(2L, "B", "B", "b.jpg", 200L, 0);
         when(productService.getProducts("widget", SortMode.PRICE, 4, 2))
-                .thenReturn(Mono.just(new PageImpl<>(List.of(i1, i2), PageRequest.of(3, 2), 100)));
+                .thenReturn(Mono.just(new ProductsPageDto(List.of(i1, i2), true, true)));
 
         webTestClient.get().uri(uri -> uri.path("/items")
                         .queryParam("search", "widget")
@@ -86,7 +85,7 @@ class ProductControllerTest extends ControllerWebFluxTestBase {
         when(cartService.quantity(eq(1L), any(WebSession.class))).thenReturn(7);
         when(cartService.quantity(eq(2L), any(WebSession.class))).thenReturn(11);
         when(productService.getProducts("", SortMode.NO, 1, 5))
-                .thenReturn(Mono.just(new PageImpl<>(List.of(i1, i2, i3))));
+                .thenReturn(Mono.just(new ProductsPageDto(List.of(i1, i2, i3), false, false)));
 
         webTestClient.get().uri("/items")
                 .exchange()
@@ -105,7 +104,7 @@ class ProductControllerTest extends ControllerWebFluxTestBase {
         ItemDto i3 = new ItemDto(3L, "Charlie", "C", "c.jpg", 300L, 0);
         ItemDto i4 = new ItemDto(4L, "Delta", "D", "d.jpg", 400L, 0);
         when(productService.getProducts("", SortMode.NO, 1, 5))
-                .thenReturn(Mono.just(new PageImpl<>(List.of(i1, i2, i3, i4))));
+                .thenReturn(Mono.just(new ProductsPageDto(List.of(i1, i2, i3, i4), false, false)));
 
         webTestClient.get().uri("/items")
                 .exchange()

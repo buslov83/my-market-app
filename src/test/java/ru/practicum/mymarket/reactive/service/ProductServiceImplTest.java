@@ -8,11 +8,9 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.test.StepVerifier;
 import ru.practicum.mymarket.dto.ItemDto;
 import ru.practicum.mymarket.dto.enums.SortMode;
 import ru.practicum.mymarket.reactive.model.Product;
@@ -25,7 +23,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ProductServiceImplTest {
@@ -37,7 +36,7 @@ class ProductServiceImplTest {
     private ProductServiceImpl productService;
 
     @Captor
-    private ArgumentCaptor<Pageable> pageableCaptor;
+    private ArgumentCaptor<Sort> sortCaptor;
 
     @Test
     void loadProductsFromCsv_parsesAndFiltersCorrectly(@TempDir Path tempDir) throws IOException {
@@ -61,9 +60,9 @@ class ProductServiceImplTest {
                     return Flux.fromIterable(arg);
                 });
 
-        StepVerifier.create(productService.loadProductsFromCsv(csvFile))
-                .expectNext(2L)
-                .verifyComplete();
+        Long inserted = productService.loadProductsFromCsv(csvFile).block();
+
+        assertThat(inserted).isEqualTo(2L);
 
         ArgumentCaptor<List<Product>> captor = ArgumentCaptor.captor();
         verify(productRepository).saveAll(captor.capture());
@@ -97,158 +96,123 @@ class ProductServiceImplTest {
                     return Flux.fromIterable(arg);
                 });
 
-        StepVerifier.create(productService.loadProductsFromCsv(missing))
-                .expectNext(0L)
-                .verifyComplete();
+        Long inserted = productService.loadProductsFromCsv(missing).block();
+
+        assertThat(inserted).isEqualTo(0L);
     }
 
     @Test
-    void getProducts_blankSearch_delegatesToFindAll() {
-        when(productRepository.findAllBy(any(Pageable.class))).thenReturn(Flux.empty());
-        when(productRepository.count()).thenReturn(Mono.just(0L));
-
-        StepVerifier.create(productService.getProducts("", SortMode.NO, 1, 5))
-                .expectNextCount(1)
-                .verifyComplete();
-
-        verify(productRepository, never())
-                .findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(anyString(), anyString(), any());
-        verify(productRepository, never())
-                .countByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(anyString(), anyString());
-    }
-
-    @Test
-    void getProducts_nullSearch_delegatesToFindAll() {
-        when(productRepository.findAllBy(any(Pageable.class))).thenReturn(Flux.empty());
-        when(productRepository.count()).thenReturn(Mono.just(0L));
-
-        StepVerifier.create(productService.getProducts(null, SortMode.NO, 1, 5))
-                .expectNextCount(1)
-                .verifyComplete();
-
-        verify(productRepository, never())
-                .findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(anyString(), anyString(), any());
-    }
-
-    @Test
-    void getProducts_whitespaceSearch_delegatesToFindAll() {
-        when(productRepository.findAllBy(any(Pageable.class))).thenReturn(Flux.empty());
-        when(productRepository.count()).thenReturn(Mono.just(0L));
-
-        StepVerifier.create(productService.getProducts("   ", SortMode.NO, 1, 5))
-                .expectNextCount(1)
-                .verifyComplete();
-
-        verify(productRepository, never())
-                .findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(anyString(), anyString(), any());
-    }
-
-    @Test
-    void getProducts_nonBlankSearch_delegatesToSearchQueryTrimmed() {
-        when(productRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
-                eq("widget"), eq("widget"), any(Pageable.class)))
+    void getProducts_nullSearch_forwardsEmptySearch() {
+        when(productRepository.findByTitleOrDescription(eq(""), any(Sort.class), anyLong(), anyInt()))
                 .thenReturn(Flux.empty());
-        when(productRepository.countByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
-                eq("widget"), eq("widget")))
-                .thenReturn(Mono.just(0L));
 
-        StepVerifier.create(productService.getProducts("  widget  ", SortMode.NO, 1, 5))
-                .expectNextCount(1)
-                .verifyComplete();
-
-        verify(productRepository, never()).findAllBy(any());
-        verify(productRepository, never()).count();
+        var page = productService.getProducts(null, SortMode.NO, 1, 5).block();
+        assertThat(page).isNotNull();
+        assertThat(page.items()).isEmpty();
     }
 
     @Test
-    void getProducts_pageNumberAndSize() {
-        when(productRepository.findAllBy(any(Pageable.class))).thenReturn(Flux.empty());
-        when(productRepository.count()).thenReturn(Mono.just(0L));
+    void getProducts_nonNullSearch_forwardsSearchTrimmed() {
+        when(productRepository.findByTitleOrDescription(eq("widget"), any(Sort.class), anyLong(), anyInt()))
+                .thenReturn(Flux.empty());
 
-        StepVerifier.create(productService.getProducts("", SortMode.NO, 1, 5))
-                .expectNextCount(1)
-                .verifyComplete();
+        var page = productService.getProducts("  widget  ", SortMode.NO, 1, 5).block();
+        assertThat(page).isNotNull();
+    }
 
-        verify(productRepository).findAllBy(pageableCaptor.capture());
-        Pageable pageable = pageableCaptor.getValue();
-        assertThat(pageable.getPageNumber()).isEqualTo(0);
-        assertThat(pageable.getPageSize()).isEqualTo(5);
+    @Test
+    void getProducts_pageNumberAndSize_translateToOffsetAndLimitPlusOne() {
+        when(productRepository.findByTitleOrDescription(eq(""), any(Sort.class), eq(14L), eq(8)))
+                .thenReturn(Flux.empty());
+
+        var page = productService.getProducts("", SortMode.NO, 3, 7).block();
+        assertThat(page).isNotNull();
     }
 
     @Test
     void getProducts_sortNo_sortsByIdAsc() {
-        when(productRepository.findAllBy(any(Pageable.class))).thenReturn(Flux.empty());
-        when(productRepository.count()).thenReturn(Mono.just(0L));
+        when(productRepository.findByTitleOrDescription(any(), any(Sort.class), anyLong(), anyInt()))
+                .thenReturn(Flux.empty());
 
-        StepVerifier.create(productService.getProducts("", SortMode.NO, 1, 5))
-                .expectNextCount(1)
-                .verifyComplete();
+        productService.getProducts("", SortMode.NO, 1, 5).block();
 
-        verify(productRepository).findAllBy(pageableCaptor.capture());
-        Sort sort = pageableCaptor.getValue().getSort();
+        verify(productRepository).findByTitleOrDescription(any(), sortCaptor.capture(), anyLong(), anyInt());
+        Sort sort = sortCaptor.getValue();
         Sort.Order id = sort.getOrderFor("id");
         assertThat(id).isNotNull();
         assertThat(id.getDirection()).isEqualTo(Sort.Direction.ASC);
     }
 
     @Test
-    void getProducts_sortAlpha_sortsByTitleIgnoreCaseThenId() {
-        when(productRepository.findAllBy(any(Pageable.class))).thenReturn(Flux.empty());
-        when(productRepository.count()).thenReturn(Mono.just(0L));
+    void getProducts_sortAlpha_sortsByLowerTitleThenId() {
+        when(productRepository.findByTitleOrDescription(any(), any(Sort.class), anyLong(), anyInt()))
+                .thenReturn(Flux.empty());
 
-        StepVerifier.create(productService.getProducts("", SortMode.ALPHA, 1, 5))
-                .expectNextCount(1)
-                .verifyComplete();
+        productService.getProducts("", SortMode.ALPHA, 1, 5).block();
 
-        verify(productRepository).findAllBy(pageableCaptor.capture());
-        Sort sort = pageableCaptor.getValue().getSort();
-        assertThat(sort).extracting(Sort.Order::getProperty).containsExactly("title", "id");
-        Sort.Order title = sort.getOrderFor("title");
-        assertThat(title).isNotNull();
-        assertThat(title.getDirection()).isEqualTo(Sort.Direction.ASC);
-        assertThat(title.isIgnoreCase()).isTrue();
-        Sort.Order id = sort.getOrderFor("id");
-        assertThat(id).isNotNull();
-        assertThat(id.getDirection()).isEqualTo(Sort.Direction.ASC);
+        verify(productRepository).findByTitleOrDescription(any(), sortCaptor.capture(), anyLong(), anyInt());
+        Sort sort = sortCaptor.getValue();
+        assertThat(sort).extracting(Sort.Order::getProperty).containsExactly("LOWER(title)", "id");
+        assertThat(sort).allSatisfy(order ->
+                assertThat(order.getDirection()).isEqualTo(Sort.Direction.ASC));
     }
 
     @Test
     void getProducts_sortPrice_sortsByPriceThenId() {
-        when(productRepository.findAllBy(any(Pageable.class))).thenReturn(Flux.empty());
-        when(productRepository.count()).thenReturn(Mono.just(0L));
+        when(productRepository.findByTitleOrDescription(any(), any(Sort.class), anyLong(), anyInt()))
+                .thenReturn(Flux.empty());
 
-        StepVerifier.create(productService.getProducts("", SortMode.PRICE, 1, 5))
-                .expectNextCount(1)
-                .verifyComplete();
+        productService.getProducts("", SortMode.PRICE, 1, 5).block();
 
-        verify(productRepository).findAllBy(pageableCaptor.capture());
-        Sort sort = pageableCaptor.getValue().getSort();
+        verify(productRepository).findByTitleOrDescription(any(), sortCaptor.capture(), anyLong(), anyInt());
+        Sort sort = sortCaptor.getValue();
         assertThat(sort).extracting(Sort.Order::getProperty).containsExactly("price", "id");
-        Sort.Order price = sort.getOrderFor("price");
-        assertThat(price).isNotNull();
-        assertThat(price.getDirection()).isEqualTo(Sort.Direction.ASC);
-        Sort.Order id = sort.getOrderFor("id");
-        assertThat(id).isNotNull();
-        assertThat(id.getDirection()).isEqualTo(Sort.Direction.ASC);
+        assertThat(sort).allSatisfy(order ->
+                assertThat(order.getDirection()).isEqualTo(Sort.Direction.ASC));
     }
 
     @Test
-    void getProducts_mapsProductsToItemDTOs() {
-        Product widget = product(10L, "Widget", "A widget", "img/w.jpg", 199L);
-        Product gadget = product(11L, "Gadget", "A gadget", "img/g.jpg", 299L);
-        when(productRepository.findAllBy(any(Pageable.class))).thenReturn(Flux.just(widget, gadget));
-        when(productRepository.count()).thenReturn(Mono.just(5L));
+    void getProducts_mapsProductsToItemDTOs_andTrimsToPageSize() {
+        Product p1 = product(10L, "Widget", "A widget", "img/w.jpg", 199L);
+        Product p2 = product(11L, "Gadget", "A gadget", "img/g.jpg", 299L);
+        Product p3 = product(12L, "Ball", "A ball", "img/b.jpg", 399L);
+        when(productRepository.findByTitleOrDescription(any(), any(Sort.class), eq(0L), eq(3)))
+                .thenReturn(Flux.just(p1, p2, p3));
 
-        StepVerifier.create(productService.getProducts("", SortMode.NO, 1, 2))
-                .assertNext(page -> {
-                    assertThat(page.getContent()).containsExactly(
-                            new ItemDto(10L, "Widget", "A widget", "img/w.jpg", 199L, 0),
-                            new ItemDto(11L, "Gadget", "A gadget", "img/g.jpg", 299L, 0));
-                    assertThat(page.getTotalElements()).isEqualTo(5);
-                    assertThat(page.hasPrevious()).isFalse();
-                    assertThat(page.hasNext()).isTrue();
-                })
-                .verifyComplete();
+        var page = productService.getProducts("", SortMode.NO, 1, 2).block();
+
+        assertThat(page).isNotNull();
+        assertThat(page.items()).containsExactly(
+                new ItemDto(10L, "Widget", "A widget", "img/w.jpg", 199L, 0),
+                new ItemDto(11L, "Gadget", "A gadget", "img/g.jpg", 299L, 0));
+        assertThat(page.hasPrevious()).isFalse();
+        assertThat(page.hasNext()).isTrue();
+    }
+
+    @Test
+    void getProducts_hasNextFalseWhenFewerRowsReturned() {
+        Product p1 = product(10L, "Widget", "A widget", "img/w.jpg", 199L);
+        Product p2 = product(11L, "Gadget", "A gadget", "img/g.jpg", 299L);
+        when(productRepository.findByTitleOrDescription(any(), any(Sort.class), eq(0L), eq(3)))
+                .thenReturn(Flux.just(p1, p2));
+
+        var page = productService.getProducts("", SortMode.NO, 1, 2).block();
+
+        assertThat(page).isNotNull();
+        assertThat(page.items()).hasSize(2);
+        assertThat(page.hasNext()).isFalse();
+        assertThat(page.hasPrevious()).isFalse();
+    }
+
+    @Test
+    void getProducts_hasPreviousTrueFromPageTwo() {
+        when(productRepository.findByTitleOrDescription(any(), any(Sort.class), anyLong(), anyInt()))
+                .thenReturn(Flux.empty());
+
+        var page = productService.getProducts("", SortMode.NO, 2, 5).block();
+
+        assertThat(page).isNotNull();
+        assertThat(page.hasPrevious()).isTrue();
     }
 
     @Test
@@ -256,24 +220,23 @@ class ProductServiceImplTest {
         Product widget = product(42L, "Widget", "A widget", "img/w.jpg", 199L);
         when(productRepository.findById(42L)).thenReturn(Mono.just(widget));
 
-        StepVerifier.create(productService.getProduct(42L))
-                .assertNext(dto -> {
-                    assertThat(dto.id()).isEqualTo(42L);
-                    assertThat(dto.title()).isEqualTo("Widget");
-                    assertThat(dto.description()).isEqualTo("A widget");
-                    assertThat(dto.imgPath()).isEqualTo("img/w.jpg");
-                    assertThat(dto.price()).isEqualTo(199L);
-                    assertThat(dto.count()).isZero();
-                })
-                .verifyComplete();
+        ItemDto dto = productService.getProduct(42L).block();
+
+        assertThat(dto).isNotNull();
+        assertThat(dto.id()).isEqualTo(42L);
+        assertThat(dto.title()).isEqualTo("Widget");
+        assertThat(dto.description()).isEqualTo("A widget");
+        assertThat(dto.imgPath()).isEqualTo("img/w.jpg");
+        assertThat(dto.price()).isEqualTo(199L);
+        assertThat(dto.count()).isZero();
     }
 
     @Test
     void getProduct_whenNotExists_completesEmpty() {
         when(productRepository.findById(99L)).thenReturn(Mono.empty());
 
-        StepVerifier.create(productService.getProduct(99L))
-                .verifyComplete();
+        ItemDto dto = productService.getProduct(99L).block();
+        assertThat(dto).isNull();
     }
 
     private static Product product(long id, String title, String description,
