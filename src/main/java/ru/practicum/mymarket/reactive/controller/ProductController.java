@@ -99,8 +99,8 @@ public class ProductController {
 
     private Mono<Void> applyCartAction(long id, CartAction action, WebSession session) {
         return switch (action) {
-            case PLUS -> Mono.fromRunnable(() -> cartService.plus(id, session));
-            case MINUS -> Mono.fromRunnable(() -> cartService.minus(id, session));
+            case PLUS -> cartService.plus(id, session);
+            case MINUS -> cartService.minus(id, session);
             case DELETE -> Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST));
         };
     }

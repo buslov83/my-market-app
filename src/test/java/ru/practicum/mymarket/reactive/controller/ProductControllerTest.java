@@ -140,6 +140,8 @@ class ProductControllerTest extends ControllerWebFluxTestBase {
 
     @Test
     void postItems_plus_incrementsCartAndRedirects() {
+        when(cartService.plus(anyLong(), any(WebSession.class))).thenReturn(Mono.empty());
+
         webTestClient.post().uri("/items")
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(BodyInserters.fromFormData("id", "42").with("action", "PLUS"))
@@ -153,6 +155,8 @@ class ProductControllerTest extends ControllerWebFluxTestBase {
 
     @Test
     void postItems_minus_decrementsCartAndRedirects() {
+        when(cartService.minus(anyLong(), any(WebSession.class))).thenReturn(Mono.empty());
+
         webTestClient.post().uri("/items")
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(BodyInserters.fromFormData("id", "42").with("action", "MINUS"))
@@ -165,6 +169,8 @@ class ProductControllerTest extends ControllerWebFluxTestBase {
 
     @Test
     void postItems_redirectEchoesQueryParams() {
+        when(cartService.plus(anyLong(), any(WebSession.class))).thenReturn(Mono.empty());
+
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("id", "7");
         form.add("action", "PLUS");
@@ -187,6 +193,7 @@ class ProductControllerTest extends ControllerWebFluxTestBase {
         ItemDto dto = new ItemDto(1L, "Widget", "A widget", "img/w.jpg", 199L, 0);
         when(productService.getProduct(1L)).thenReturn(Mono.just(dto));
         when(cartService.quantity(eq(1L), any(WebSession.class))).thenReturn(5);
+        when(cartService.plus(anyLong(), any(WebSession.class))).thenReturn(Mono.empty());
 
         webTestClient.post().uri("/items/1")
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
@@ -204,6 +211,7 @@ class ProductControllerTest extends ControllerWebFluxTestBase {
         ItemDto dto = new ItemDto(1L, "Widget", "A widget", "img/w.jpg", 199L, 0);
         when(productService.getProduct(1L)).thenReturn(Mono.just(dto));
         when(cartService.quantity(eq(1L), any(WebSession.class))).thenReturn(5);
+        when(cartService.minus(anyLong(), any(WebSession.class))).thenReturn(Mono.empty());
 
         webTestClient.post().uri("/items/1")
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)

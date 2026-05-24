@@ -2,6 +2,7 @@ package ru.practicum.mymarket.reactive.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.WebSession;
+import reactor.core.publisher.Mono;
 
 @Service
 public class CartServiceImpl implements CartService {
@@ -9,13 +10,13 @@ public class CartServiceImpl implements CartService {
     private static final String CART_ATTRIBUTE = "cart";
 
     @Override
-    public void plus(long productId, WebSession session) {
-        resolveCart(session).plus(productId);
+    public Mono<Void> plus(long productId, WebSession session) {
+        return Mono.fromRunnable(() -> resolveCart(session).plus(productId));
     }
 
     @Override
-    public void minus(long productId, WebSession session) {
-        resolveCart(session).minus(productId);
+    public Mono<Void> minus(long productId, WebSession session) {
+        return Mono.fromRunnable(() -> resolveCart(session).minus(productId));
     }
 
     @Override
