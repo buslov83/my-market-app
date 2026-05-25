@@ -1,15 +1,33 @@
 package ru.practicum.mymarket.reactive.service;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.server.MockWebSession;
+import reactor.core.publisher.Flux;
+import ru.practicum.mymarket.dto.CartDto;
+import ru.practicum.mymarket.dto.ItemDto;
+import ru.practicum.mymarket.reactive.model.Product;
+import ru.practicum.mymarket.reactive.repository.ProductRepository;
+
+import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class CartServiceImplTest {
 
     private static final String CART_ATTRIBUTE = "cart";
 
-    private final CartServiceImpl cartService = new CartServiceImpl();
+    @Mock
+    private ProductRepository productRepository;
+
+    @InjectMocks
+    private CartServiceImpl cartService;
 
     @Test
     void plus_whenSessionEmpty_createsNewCartWithItem() {
@@ -87,5 +105,68 @@ class CartServiceImplTest {
         Cart after = session.getAttribute(CART_ATTRIBUTE);
         assertThat(after).isSameAs(existing);
         assertThat(quantity).isEqualTo(3);
+    }
+
+    @Test
+    void getCart_emptyCart_returnsEmptyCartDto() {
+        MockWebSession session = new MockWebSession();
+        when(productRepository.findAllById(Set.of())).thenReturn(Flux.empty());
+
+        CartDto cart = cartService.getCart(session).block();
+
+        assertThat(cart).isEqualTo(new CartDto(List.of(), 0L));
+    }
+
+    @Test
+    void getCart_returnsItemsInInsertionOrderWithTotal() {
+        MockWebSession session = new MockWebSession();
+        Cart existing = new Cart();
+        existing.plus(3L);
+        existing.plus(1L);
+        existing.plus(2L);
+        existing.plus(3L);
+        existing.plus(1L);
+        existing.plus(3L);
+        session.getAttributes().put(CART_ATTRIBUTE, existing);
+
+        Product p1 = product(1L, "One", "one", "img/1.jpg", 100L);
+        Product p2 = product(2L, "Two", "two", "img/2.jpg", 200L);
+        Product p3 = product(3L, "Three", "three", "img/3.jpg", 300L);
+        // Repo returns products in an order different from the cart insertion order.
+        when(productRepository.findAllById(Set.of(1L, 2L, 3L))).thenReturn(Flux.just(p2, p1, p3));
+
+        CartDto cart = cartService.getCart(session).block();
+
+        assertThat(cart).isNotNull();
+        assertThat(cart.items()).containsExactly(
+                new ItemDto(3L, "Three", "three", "img/3.jpg", 300L, 3),
+                new ItemDto(1L, "One", "one", "img/1.jpg", 100L, 2),
+                new ItemDto(2L, "Two", "two", "img/2.jpg", 200L, 1));
+        assertThat(cart.total()).isEqualTo(300L * 3 + 100L * 2 + 200L);
+    }
+
+    @Test
+    void getCart_skipsProductsMissingFromRepository() {
+        MockWebSession session = new MockWebSession();
+        Cart existing = new Cart();
+        existing.plus(1L);
+        existing.plus(2L);
+        session.getAttributes().put(CART_ATTRIBUTE, existing);
+
+        Product p1 = product(1L, "Widget", "A widget", "img/w.jpg", 199L);
+        when(productRepository.findAllById(Set.of(1L, 2L))).thenReturn(Flux.just(p1));
+
+        CartDto cart = cartService.getCart(session).block();
+
+        assertThat(cart).isNotNull();
+        assertThat(cart.items()).containsExactly(
+                new ItemDto(1L, "Widget", "A widget", "img/w.jpg", 199L, 1));
+        assertThat(cart.total()).isEqualTo(199L);
+    }
+
+    private static Product product(long id, String title, String description, String imgPath, long price) {
+        Product p = new Product(title, description, imgPath, price);
+        p.setId(id);
+        return p;
     }
 }

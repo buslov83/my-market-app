@@ -2,6 +2,7 @@ package ru.practicum.mymarket.reactive.service;
 
 import org.springframework.web.server.WebSession;
 import reactor.core.publisher.Mono;
+import ru.practicum.mymarket.dto.CartDto;
 
 public interface CartService {
 
@@ -10,4 +11,6 @@ public interface CartService {
     Mono<Void> minus(long productId, WebSession session);
 
     int quantity(long productId, WebSession session);
+
+    Mono<CartDto> getCart(WebSession session);
 }
