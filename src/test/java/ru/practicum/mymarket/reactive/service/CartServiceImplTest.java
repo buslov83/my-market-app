@@ -30,7 +30,7 @@ class CartServiceImplTest {
     private CartServiceImpl cartService;
 
     @Test
-    void plus_whenSessionEmpty_createsNewCartWithItem() {
+    void plus_whenSessionEmpty_createsNewCartWithOneItem() {
         MockWebSession session = new MockWebSession();
 
         cartService.plus(1L, session).block();
@@ -41,7 +41,7 @@ class CartServiceImplTest {
     }
 
     @Test
-    void plus_existingCart() {
+    void plus_delegatesToExistingCart() {
         MockWebSession session = new MockWebSession();
         Cart existing = new Cart();
         existing.plus(1L);
@@ -66,7 +66,7 @@ class CartServiceImplTest {
     }
 
     @Test
-    void minus_existingCart() {
+    void minus_delegatesToExistingCart() {
         MockWebSession session = new MockWebSession();
         Cart existing = new Cart();
         existing.plus(1L);
@@ -78,6 +78,33 @@ class CartServiceImplTest {
         Cart after = session.getAttribute(CART_ATTRIBUTE);
         assertThat(after).isSameAs(existing);
         assertThat(after.quantity(1L)).isEqualTo(1);
+    }
+
+    @Test
+    void delete_whenSessionEmpty_createsEmptyCart() {
+        MockWebSession session = new MockWebSession();
+
+        cartService.delete(1L, session).block();
+
+        Cart stored = session.getAttribute(CART_ATTRIBUTE);
+        assertThat(stored).isNotNull();
+        assertThat(stored.quantity(1L)).isZero();
+    }
+
+    @Test
+    void delete_delegatesToExistingCart() {
+        MockWebSession session = new MockWebSession();
+        Cart existing = new Cart();
+        existing.plus(1L);
+        existing.plus(1L);
+        existing.plus(1L);
+        session.getAttributes().put(CART_ATTRIBUTE, existing);
+
+        cartService.delete(1L, session).block();
+
+        Cart after = session.getAttribute(CART_ATTRIBUTE);
+        assertThat(after).isSameAs(existing);
+        assertThat(after.quantity(1L)).isZero();
     }
 
     @Test

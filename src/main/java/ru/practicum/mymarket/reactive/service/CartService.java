@@ -10,6 +10,8 @@ public interface CartService {
 
     Mono<Void> minus(long productId, WebSession session);
 
+    Mono<Void> delete(long productId, WebSession session);
+
     int quantity(long productId, WebSession session);
 
     Mono<CartDto> getCart(WebSession session);

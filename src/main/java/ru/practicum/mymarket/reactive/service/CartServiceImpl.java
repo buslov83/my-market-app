@@ -34,6 +34,11 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
+    public Mono<Void> delete(long productId, WebSession session) {
+        return Mono.fromRunnable(() -> resolveCart(session).delete(productId));
+    }
+
+    @Override
     public int quantity(long productId, WebSession session) {
         return resolveCart(session).quantity(productId);
     }
