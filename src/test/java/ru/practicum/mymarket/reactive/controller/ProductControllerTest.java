@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-class ProductControllerTest extends ControllerWebFluxTestBase {
+class ProductControllerTest extends ControllerTestBase {
 
     @Test
     void getRoot_rendersItemsViewWithDefaults() {
@@ -192,7 +192,7 @@ class ProductControllerTest extends ControllerWebFluxTestBase {
     void postProduct_plus_incrementsCartAndRendersItemView() {
         ItemDto dto = new ItemDto(1L, "Widget", "A widget", "img/w.jpg", 199L, 0);
         when(productService.getProduct(1L)).thenReturn(Mono.just(dto));
-        when(cartService.quantity(eq(1L), any(WebSession.class))).thenReturn(5);
+        when(cartService.quantity(anyLong(), any(WebSession.class))).thenReturn(5);
         when(cartService.plus(anyLong(), any(WebSession.class))).thenReturn(Mono.empty());
 
         webTestClient.post().uri("/items/1")
@@ -203,14 +203,16 @@ class ProductControllerTest extends ControllerWebFluxTestBase {
                 .expectBody(String.class)
                 .value(body -> assertThat(body).containsSubsequence("Widget", "<span>5</span>"));
 
+        verify(cartService).quantity(eq(1L), any(WebSession.class));
         verify(cartService).plus(eq(1L), any(WebSession.class));
+        verifyNoMoreInteractions(cartService);
     }
 
     @Test
     void postProduct_minus_decrementsCartAndRendersItemView() {
         ItemDto dto = new ItemDto(1L, "Widget", "A widget", "img/w.jpg", 199L, 0);
         when(productService.getProduct(1L)).thenReturn(Mono.just(dto));
-        when(cartService.quantity(eq(1L), any(WebSession.class))).thenReturn(5);
+        when(cartService.quantity(anyLong(), any(WebSession.class))).thenReturn(5);
         when(cartService.minus(anyLong(), any(WebSession.class))).thenReturn(Mono.empty());
 
         webTestClient.post().uri("/items/1")
@@ -221,6 +223,8 @@ class ProductControllerTest extends ControllerWebFluxTestBase {
                 .expectBody(String.class)
                 .value(body -> assertThat(body).containsSubsequence("Widget", "<span>5</span>"));
 
+        verify(cartService).quantity(eq(1L), any(WebSession.class));
         verify(cartService).minus(eq(1L), any(WebSession.class));
+        verifyNoMoreInteractions(cartService);
     }
 }

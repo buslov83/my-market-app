@@ -8,7 +8,7 @@ import ru.practicum.mymarket.reactive.service.CartService;
 import ru.practicum.mymarket.reactive.service.ProductService;
 
 @WebFluxTest
-abstract class ControllerWebFluxTestBase {
+abstract class ControllerTestBase {
 
     @Autowired
     protected WebTestClient webTestClient;
