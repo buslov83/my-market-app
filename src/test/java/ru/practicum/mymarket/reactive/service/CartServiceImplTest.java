@@ -2,20 +2,30 @@ package ru.practicum.mymarket.reactive.service;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.server.MockWebSession;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import ru.practicum.mymarket.dto.CartDto;
 import ru.practicum.mymarket.dto.ItemDto;
+import ru.practicum.mymarket.reactive.model.Order;
+import ru.practicum.mymarket.reactive.model.OrderItem;
 import ru.practicum.mymarket.reactive.model.Product;
+import ru.practicum.mymarket.reactive.repository.OrderItemRepository;
+import ru.practicum.mymarket.reactive.repository.OrderRepository;
 import ru.practicum.mymarket.reactive.repository.ProductRepository;
 
 import java.util.List;
 import java.util.Set;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyIterable;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -26,8 +36,17 @@ class CartServiceImplTest {
     @Mock
     private ProductRepository productRepository;
 
+    @Mock
+    private OrderRepository orderRepository;
+
+    @Mock
+    private OrderItemRepository orderItemRepository;
+
     @InjectMocks
     private CartServiceImpl cartService;
+
+    @Captor
+    private ArgumentCaptor<Iterable<OrderItem>> orderItemsCaptor;
 
     @Test
     void plus_whenSessionEmpty_createsNewCartWithOneItem() {
@@ -50,6 +69,7 @@ class CartServiceImplTest {
         cartService.plus(1L, session).block();
 
         Cart after = session.getAttribute(CART_ATTRIBUTE);
+        assertThat(after).isNotNull();
         assertThat(after).isSameAs(existing);
         assertThat(after.quantity(1L)).isEqualTo(2);
     }
@@ -76,6 +96,7 @@ class CartServiceImplTest {
         cartService.minus(1L, session).block();
 
         Cart after = session.getAttribute(CART_ATTRIBUTE);
+        assertThat(after).isNotNull();
         assertThat(after).isSameAs(existing);
         assertThat(after.quantity(1L)).isEqualTo(1);
     }
@@ -103,6 +124,7 @@ class CartServiceImplTest {
         cartService.delete(1L, session).block();
 
         Cart after = session.getAttribute(CART_ATTRIBUTE);
+        assertThat(after).isNotNull();
         assertThat(after).isSameAs(existing);
         assertThat(after.quantity(1L)).isZero();
     }
@@ -189,6 +211,52 @@ class CartServiceImplTest {
         assertThat(cart.items()).containsExactly(
                 new ItemDto(1L, "Widget", "A widget", "img/w.jpg", 199L, 1));
         assertThat(cart.total()).isEqualTo(199L);
+    }
+
+    @Test
+    void checkout_emptyCart_propagatesIllegalStateException() {
+        MockWebSession session = new MockWebSession();
+        when(productRepository.findAllById(Set.of())).thenReturn(Flux.empty());
+
+        assertThatThrownBy(() -> cartService.checkout(session).block())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Cart is empty");
+    }
+
+    @Test
+    void checkout_savesOrderAndItems_clearsCart_returnsOrderId() {
+        MockWebSession session = new MockWebSession();
+        Cart existing = new Cart();
+        existing.plus(1L);
+        existing.plus(2L);
+        existing.plus(1L);
+        session.getAttributes().put(CART_ATTRIBUTE, existing);
+
+        Product p1 = product(1L, "Widget", "A widget", "img/w.jpg", 100L);
+        Product p2 = product(2L, "Gadget", "A gadget", "img/g.jpg", 250L);
+        when(productRepository.findAllById(Set.of(1L, 2L))).thenReturn(Flux.just(p1, p2));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
+            Order order = invocation.getArgument(0);
+            order.setId(42L);
+            return Mono.just(order);
+        });
+        when(orderItemRepository.saveAll(anyIterable())).thenReturn(Flux.empty());
+
+        Long orderId = cartService.checkout(session).block();
+
+        assertThat(orderId).isEqualTo(42L);
+        Cart afterClear = session.getAttribute(CART_ATTRIBUTE);
+        assertThat(afterClear).isNotNull();
+        assertThat(afterClear).isSameAs(existing);
+        assertThat(afterClear.entries()).isEmpty();
+
+        verify(orderItemRepository).saveAll(orderItemsCaptor.capture());
+        assertThat(orderItemsCaptor.getValue())
+                .extracting(OrderItem::getOrderId, OrderItem::getProductId, OrderItem::getTitle,
+                        OrderItem::getPrice, OrderItem::getQuantity)
+                .containsExactly(
+                        tuple(42L, 1L, "Widget", 100L, 2),
+                        tuple(42L, 2L, "Gadget", 250L, 1));
     }
 
     private static Product product(long id, String title, String description, String imgPath, long price) {

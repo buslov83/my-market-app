@@ -15,4 +15,6 @@ public interface CartService {
     int quantity(long productId, WebSession session);
 
     Mono<CartDto> getCart(WebSession session);
+
+    Mono<Long> checkout(WebSession session);
 }
