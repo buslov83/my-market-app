@@ -29,4 +29,12 @@ public class OrderController {
                         .build())
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)));
     }
+
+    @GetMapping("/orders")
+    public Mono<Rendering> getOrders() {
+        return orderService.getOrders()
+                .map(orders -> Rendering.view("orders")
+                        .modelAttribute("orders", orders)
+                        .build());
+    }
 }

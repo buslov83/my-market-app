@@ -26,6 +26,14 @@ public class OrderServiceImpl implements OrderService {
                 .map(items -> toDto(id, items));
     }
 
+    @Override
+    public Mono<List<OrderDto>> getOrders() {
+        return orderItemRepository.findAllByOrderByOrderIdAscIdAsc()
+                .bufferUntilChanged(OrderItem::getOrderId)
+                .map(items -> toDto(items.getFirst().getOrderId(), items))
+                .collectList();
+    }
+
     private static OrderDto toDto(long id, List<OrderItem> orderItems) {
         List<ItemDto> items = orderItems.stream()
                 .map(oi -> new ItemDto(oi.getProductId(), oi.getTitle(), "", "", oi.getPrice(), oi.getQuantity()))

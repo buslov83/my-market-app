@@ -7,4 +7,6 @@ import ru.practicum.mymarket.reactive.model.OrderItem;
 public interface OrderItemRepository extends ReactiveCrudRepository<OrderItem, Long> {
 
     Flux<OrderItem> findByOrderIdOrderByIdAsc(Long orderId);
+
+    Flux<OrderItem> findAllByOrderByOrderIdAscIdAsc();
 }
