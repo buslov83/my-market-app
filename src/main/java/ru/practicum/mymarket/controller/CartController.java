@@ -1,17 +1,19 @@
 package ru.practicum.mymarket.controller;
 
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.reactive.result.view.Rendering;
+import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.WebSession;
+import reactor.core.publisher.Mono;
 import ru.practicum.mymarket.dto.CartDto;
 import ru.practicum.mymarket.dto.enums.CartAction;
 import ru.practicum.mymarket.service.CartService;
 
+import static java.util.Objects.requireNonNull;
+
 @Controller
-@RequestMapping("/cart/items")
 public class CartController {
 
     private final CartService cartService;
@@ -20,26 +22,40 @@ public class CartController {
         this.cartService = cartService;
     }
 
-    @GetMapping
-    public String getCart(Model model) {
-        populateCartModel(model);
-        return "cart";
+    @GetMapping("/cart/items")
+    public Mono<Rendering> getCart(WebSession session) {
+        return cartService.getCart(session).map(CartController::renderCart);
     }
 
-    @PostMapping
-    public String updateCart(@RequestParam long id, @RequestParam CartAction action, Model model) {
-        switch (action) {
-            case PLUS -> cartService.plus(id);
-            case MINUS -> cartService.minus(id);
-            case DELETE -> cartService.delete(id);
-        }
-        populateCartModel(model);
-        return "cart";
+    @PostMapping("/cart/items")
+    public Mono<Rendering> updateCart(ServerWebExchange exchange, WebSession session) {
+        return exchange.getFormData().flatMap(form -> {
+            long id = Long.parseLong(requireNonNull(form.getFirst("id")));
+            CartAction action = CartAction.valueOf(form.getFirst("action"));
+            return applyCartAction(id, action, session)
+                    .then(cartService.getCart(session))
+                    .map(CartController::renderCart);
+        });
     }
 
-    private void populateCartModel(Model model) {
-        CartDto cart = cartService.getCart();
-        model.addAttribute("items", cart.items());
-        model.addAttribute("total", cart.total());
+    @PostMapping("/buy")
+    public Mono<Rendering> checkout(WebSession session) {
+        return cartService.checkout(session)
+                .map(id -> Rendering.redirectTo("/orders/" + id + "?newOrder=true").build());
+    }
+
+    private Mono<Void> applyCartAction(long id, CartAction action, WebSession session) {
+        return switch (action) {
+            case PLUS -> cartService.plus(id, session);
+            case MINUS -> cartService.minus(id, session);
+            case DELETE -> cartService.delete(id, session);
+        };
+    }
+
+    private static Rendering renderCart(CartDto cart) {
+        return Rendering.view("cart")
+                .modelAttribute("items", cart.items())
+                .modelAttribute("total", cart.total())
+                .build();
     }
 }

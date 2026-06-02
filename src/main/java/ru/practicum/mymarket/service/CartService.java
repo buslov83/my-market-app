@@ -1,23 +1,20 @@
 package ru.practicum.mymarket.service;
 
+import org.springframework.web.server.WebSession;
+import reactor.core.publisher.Mono;
 import ru.practicum.mymarket.dto.CartDto;
-import ru.practicum.mymarket.dto.ItemDto;
-
-import java.util.List;
 
 public interface CartService {
 
-    void plus(long productId);
+    Mono<Void> plus(long productId, WebSession session);
 
-    void minus(long productId);
+    Mono<Void> minus(long productId, WebSession session);
 
-    void delete(long productId);
+    Mono<Void> delete(long productId, WebSession session);
 
-    int quantity(long productId);
+    int quantity(long productId, WebSession session);
 
-    List<ItemDto> getCartItems();
+    Mono<CartDto> getCart(WebSession session);
 
-    CartDto getCart();
-
-    void clear();
+    Mono<Long> checkout(WebSession session);
 }

@@ -1,15 +1,13 @@
 package ru.practicum.mymarket.service;
 
+import reactor.core.publisher.Mono;
 import ru.practicum.mymarket.dto.OrderDto;
 
 import java.util.List;
-import java.util.Optional;
 
 public interface OrderService {
 
-    long checkout();
+    Mono<OrderDto> getOrder(long id);
 
-    Optional<OrderDto> getOrder(long id);
-
-    List<OrderDto> getOrders();
+    Mono<List<OrderDto>> getOrders();
 }

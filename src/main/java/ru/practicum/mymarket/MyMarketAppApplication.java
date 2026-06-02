@@ -3,7 +3,8 @@ package ru.practicum.mymarket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -23,7 +24,7 @@ public class MyMarketAppApplication {
 
 @Component
 @ConditionalOnProperty(name = "app.catalog.load-on-startup", havingValue = "true", matchIfMissing = true)
-class ProductCatalogLoader implements CommandLineRunner {
+class ProductCatalogLoader implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(ProductCatalogLoader.class);
 
@@ -37,12 +38,13 @@ class ProductCatalogLoader implements CommandLineRunner {
     }
 
     @Override
-    public void run(String... args) {
+    public void run(ApplicationArguments args) {
         Path path = Path.of(csvPath);
         if (!Files.exists(path)) {
             log.warn("Product catalog CSV not found at {} — skipping catalog load", path.toAbsolutePath());
             return;
         }
-        productService.loadProductsFromCsv(path);
+        Long inserted = productService.loadProductsFromCsv(path).block();
+        log.info("Loaded {} new products", inserted == null ? 0 : inserted);
     }
 }

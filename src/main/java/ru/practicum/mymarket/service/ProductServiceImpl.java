@@ -3,14 +3,12 @@ package ru.practicum.mymarket.service;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.relational.domain.SqlSort;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
 import ru.practicum.mymarket.dto.ItemDto;
 import ru.practicum.mymarket.dto.ProductsPageDto;
 import ru.practicum.mymarket.dto.enums.SortMode;
@@ -21,6 +19,7 @@ import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class ProductServiceImpl implements ProductService {
@@ -28,17 +27,59 @@ public class ProductServiceImpl implements ProductService {
     private static final Logger log = LoggerFactory.getLogger(ProductServiceImpl.class);
 
     private final ProductRepository productRepository;
-    private final CartService cartService;
 
-    public ProductServiceImpl(ProductRepository productRepository, CartService cartService) {
+    public ProductServiceImpl(ProductRepository productRepository) {
         this.productRepository = productRepository;
-        this.cartService = cartService;
     }
 
     @Override
-    public void loadProductsFromCsv(Path csvPath) {
-        Set<String> alreadyLoaded = productRepository.findAllExternalIds();
+    public Mono<Long> loadProductsFromCsv(Path csvPath) {
+        return productRepository.findAllExternalIds()
+                .collect(Collectors.toSet())
+                .map(alreadyLoaded -> parseCsv(csvPath, alreadyLoaded))
+                .flatMapMany(productRepository::saveAll)
+                .count();
+    }
 
+    @Override
+    public Mono<ProductsPageDto> getProducts(String search, SortMode sort, int pageNumber, int pageSize) {
+        int offset = (pageNumber - 1) * pageSize;
+        search = search != null ? search.trim() : "";
+        return productRepository.findByTitleOrDescription(search, toSort(sort), offset, pageSize + 1)
+                .map(this::toItemDto)
+                .collectList()
+                .map(items -> {
+                    boolean hasNext = items.size() > pageSize;
+                    List<ItemDto> page = hasNext ? items.subList(0, pageSize) : items;
+                    return new ProductsPageDto(page, pageNumber > 1, hasNext);
+                });
+    }
+
+    @Override
+    public Mono<ItemDto> getProduct(long id) {
+        return productRepository.findById(id).map(this::toItemDto);
+    }
+
+    private static Sort toSort(SortMode sort) {
+        return switch (sort) {
+            case NO -> Sort.by("id").ascending();
+            case ALPHA -> SqlSort.unsafe("LOWER(title)").ascending()
+                    .and(Sort.by("id").ascending());
+            case PRICE -> Sort.by("price", "id").ascending();
+        };
+    }
+
+    private ItemDto toItemDto(Product product) {
+        return new ItemDto(
+                product.getId(),
+                product.getTitle(),
+                product.getDescription(),
+                product.getImgPath(),
+                product.getPrice(),
+                0);
+    }
+
+    private List<Product> parseCsv(Path csvPath, Set<String> excludeIds) {
         List<Product> newProducts = new ArrayList<>();
         Set<String> seenInCsv = new HashSet<>();
 
@@ -56,55 +97,16 @@ public class ProductServiceImpl implements ProductService {
                     continue;
                 }
                 String externalId = product.getExternalId();
-                if (!alreadyLoaded.contains(externalId) && seenInCsv.add(externalId)) {
+                if (!excludeIds.contains(externalId) && seenInCsv.add(externalId)) {
                     newProducts.add(product);
                 }
             }
         } catch (Exception e) {
             log.error("Failed to read product catalog CSV at {}", csvPath.toAbsolutePath(), e);
-            return;
+            return List.of();
         }
 
-        if (!newProducts.isEmpty()) {
-            productRepository.saveAll(newProducts);
-        }
-        log.info("Loaded {} new products", newProducts.size());
-    }
-
-    @Override
-    public ProductsPageDto getProducts(String search, SortMode sort, int pageNumber, int pageSize) {
-        // pageNumber in API is 1-based, need to convert to 0-based for Spring Data
-        Pageable pageable = PageRequest.of(pageNumber - 1, pageSize, toSort(sort));
-        Page<Product> page = StringUtils.isBlank(search)
-                ? productRepository.findAll(pageable)
-                : productRepository.searchByTitleOrDescription(search.trim(), pageable);
-        List<ItemDto> items = page.getContent().stream()
-                .map(this::toItemDto)
-                .toList();
-        return new ProductsPageDto(items, page.hasPrevious(), page.hasNext());
-    }
-
-    @Override
-    public Optional<ItemDto> getProduct(long id) {
-        return productRepository.findById(id).map(this::toItemDto);
-    }
-
-    private static Sort toSort(SortMode sort) {
-        return switch (sort) {
-            case NO -> Sort.by("id").ascending();
-            case ALPHA -> Sort.by(Sort.Order.asc("title").ignoreCase()).and(Sort.by("id").ascending());
-            case PRICE -> Sort.by("price", "id").ascending();
-        };
-    }
-
-    private ItemDto toItemDto(Product product) {
-        return new ItemDto(
-                product.getId(),
-                product.getTitle(),
-                product.getDescription(),
-                product.getImgPath(),
-                product.getPrice(),
-                cartService.quantity(product.getId()));
+        return newProducts;
     }
 
     private Product parseRow(CSVRecord record) {

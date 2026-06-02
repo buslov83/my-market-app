@@ -2,133 +2,118 @@ package ru.practicum.mymarket.service;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import reactor.core.publisher.Flux;
 import ru.practicum.mymarket.dto.ItemDto;
 import ru.practicum.mymarket.dto.OrderDto;
-import ru.practicum.mymarket.model.Order;
 import ru.practicum.mymarket.model.OrderItem;
-import ru.practicum.mymarket.repository.OrderRepository;
+import ru.practicum.mymarket.repository.OrderItemRepository;
 
 import java.util.List;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceImplTest {
 
     @Mock
-    private CartService cartService;
-
-    @Mock
-    private OrderRepository orderRepository;
+    private OrderItemRepository orderItemRepository;
 
     @InjectMocks
     private OrderServiceImpl orderService;
 
     @Test
-    void checkout_buildsOrderInCartItemOrderAndClearsCart() {
-        when(cartService.getCartItems()).thenReturn(List.of(
-                new ItemDto(3L, "Carrot", "desc-c", "c.jpg", 50L, 2),
-                new ItemDto(1L, "Apple", "desc-a", "a.jpg", 100L, 1),
-                new ItemDto(2L, "Bread", "desc-b", "b.jpg", 200L, 4)));
-        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> {
-            Order arg = inv.getArgument(0);
-            arg.setId(42L);
-            return arg;
-        });
+    void getOrder_noItems_returnsEmptyMono() {
+        when(orderItemRepository.findByOrderIdOrderByIdAsc(99L)).thenReturn(Flux.empty());
 
-        long orderId = orderService.checkout();
+        Optional<OrderDto> result = orderService.getOrder(99L).blockOptional();
 
-        assertThat(orderId).isEqualTo(42L);
-        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
-        verify(orderRepository).save(captor.capture());
-        Order persisted = captor.getValue();
-        assertThat(persisted.getItems())
-                .extracting(OrderItem::getProductId, OrderItem::getTitle, OrderItem::getPrice, OrderItem::getQuantity)
-                .containsExactly(
-                        tuple(3L, "Carrot", 50L, 2),
-                        tuple(1L, "Apple", 100L, 1),
-                        tuple(2L, "Bread", 200L, 4));
-        assertThat(persisted.getItems()).allSatisfy(item -> assertThat(item.getOrder()).isSameAs(persisted));
-        verify(cartService).clear();
+        assertThat(result).isEmpty();
     }
 
     @Test
-    void checkout_whenCartItemsEmpty_throwsAndDoesNotPersistOrClear() {
-        when(cartService.getCartItems()).thenReturn(List.of());
+    void getOrder_buildsDtoFromItemsInRepositoryOrder() {
+        OrderItem a = orderItem(10L, 7L, 1L, "Widget", 100L, 2);
+        OrderItem b = orderItem(11L, 7L, 2L, "Gadget", 250L, 1);
+        OrderItem c = orderItem(12L, 7L, 3L, "Sparkler", 50L, 4);
+        when(orderItemRepository.findByOrderIdOrderByIdAsc(7L))
+                .thenReturn(Flux.just(a, b, c));
 
-        assertThatThrownBy(() -> orderService.checkout()).isInstanceOf(IllegalStateException.class);
+        OrderDto order = orderService.getOrder(7L).block();
 
-        verify(orderRepository, never()).save(any(Order.class));
-        verify(cartService, never()).clear();
+        assertThat(order).isNotNull();
+        assertThat(order.id()).isEqualTo(7L);
+        assertThat(order.items()).containsExactly(
+                new ItemDto(1L, "Widget", "", "", 100L, 2),
+                new ItemDto(2L, "Gadget", "", "", 250L, 1),
+                new ItemDto(3L, "Sparkler", "", "", 50L, 4));
+        assertThat(order.totalSum()).isEqualTo(100L * 2 + 250L + 50L * 4);
     }
 
     @Test
-    void getOrder_whenExists_returnsOrderDto() {
-        Order order = new Order();
-        order.setId(7L);
-        order.addItem(new OrderItem(3L, "Carrot", 50L, 2));
-        order.addItem(new OrderItem(1L, "Apple", 100L, 1));
-        order.addItem(new OrderItem(2L, "Bread", 200L, 4));
-        when(orderRepository.findById(7L)).thenReturn(Optional.of(order));
+    void getOrders_noItems_returnsEmptyList() {
+        when(orderItemRepository.findAllByOrderByOrderIdAscIdAsc()).thenReturn(Flux.empty());
 
-        OrderDto dto = orderService.getOrder(7L).orElseThrow();
+        List<OrderDto> orders = orderService.getOrders().block();
 
-        assertThat(dto.id()).isEqualTo(7L);
-        assertThat(dto.items())
-                .extracting(ItemDto::id, ItemDto::title, ItemDto::price, ItemDto::count)
-                .containsExactly(
-                        tuple(3L, "Carrot", 50L, 2),
-                        tuple(1L, "Apple", 100L, 1),
-                        tuple(2L, "Bread", 200L, 4));
-        assertThat(dto.totalSum()).isEqualTo(50L * 2 + 100L + 200L * 4);
+        assertThat(orders).isEmpty();
     }
 
     @Test
-    void getOrder_whenNotExists_returnsEmpty() {
-        when(orderRepository.findById(99L)).thenReturn(Optional.empty());
+    void getOrders_singleOrder_returnsOneDto() {
+        OrderItem a = orderItem(10L, 5L, 1L, "Widget", 100L, 2);
+        OrderItem b = orderItem(11L, 5L, 2L, "Gadget", 250L, 1);
+        when(orderItemRepository.findAllByOrderByOrderIdAscIdAsc()).thenReturn(Flux.just(a, b));
 
-        assertThat(orderService.getOrder(99L)).isEmpty();
+        List<OrderDto> orders = orderService.getOrders().block();
+
+        assertThat(orders).hasSize(1);
+        OrderDto only = orders.getFirst();
+        assertThat(only.id()).isEqualTo(5L);
+        assertThat(only.items()).containsExactly(
+                new ItemDto(1L, "Widget", "", "", 100L, 2),
+                new ItemDto(2L, "Gadget", "", "", 250L, 1));
+        assertThat(only.totalSum()).isEqualTo(100L * 2 + 250L);
     }
 
     @Test
-    void getOrders_mapsEachOrderToDtoInRepositoryOrder() {
-        Order first = new Order();
-        first.setId(1L);
-        first.addItem(new OrderItem(1L, "Apple", 100L, 2));
-        Order second = new Order();
-        second.setId(2L);
-        second.addItem(new OrderItem(3L, "Carrot", 50L, 1));
-        second.addItem(new OrderItem(2L, "Bread", 200L, 3));
-        when(orderRepository.findAllWithItems()).thenReturn(List.of(first, second));
+    void getOrders_groupsItemsByOrderId() {
+        OrderItem a = orderItem(10L, 1L, 100L, "Apple", 50L, 3);
+        OrderItem b = orderItem(11L, 1L, 200L, "Banana", 30L, 2);
+        OrderItem c = orderItem(20L, 2L, 300L, "Cherry", 75L, 4);
+        OrderItem d = orderItem(30L, 3L, 400L, "Date", 200L, 1);
+        OrderItem e = orderItem(31L, 3L, 500L, "Elderberry", 120L, 5);
+        when(orderItemRepository.findAllByOrderByOrderIdAscIdAsc())
+                .thenReturn(Flux.just(a, b, c, d, e));
 
-        List<OrderDto> dtos = orderService.getOrders();
+        List<OrderDto> orders = orderService.getOrders().block();
 
-        assertThat(dtos).hasSize(2);
-        assertThat(dtos.get(0).id()).isEqualTo(1L);
-        assertThat(dtos.get(0).items())
-                .extracting(ItemDto::id, ItemDto::title, ItemDto::price, ItemDto::count)
-                .containsExactly(tuple(1L, "Apple", 100L, 2));
-        assertThat(dtos.get(0).totalSum()).isEqualTo(200L);
-        assertThat(dtos.get(1).id()).isEqualTo(2L);
-        assertThat(dtos.get(1).items())
-                .extracting(ItemDto::id, ItemDto::title, ItemDto::price, ItemDto::count)
-                .containsExactly(
-                        tuple(3L, "Carrot", 50L, 1),
-                        tuple(2L, "Bread", 200L, 3));
-        assertThat(dtos.get(1).totalSum()).isEqualTo(50L + 200L * 3);
+        assertThat(orders).hasSize(3);
+        assertThat(orders).extracting(OrderDto::id).containsExactly(1L, 2L, 3L);
+
+        assertThat(orders.get(0).items()).containsExactly(
+                new ItemDto(100L, "Apple", "", "", 50L, 3),
+                new ItemDto(200L, "Banana", "", "", 30L, 2));
+        assertThat(orders.get(0).totalSum()).isEqualTo(50L * 3 + 30L * 2);
+
+        assertThat(orders.get(1).items()).containsExactly(
+                new ItemDto(300L, "Cherry", "", "", 75L, 4));
+        assertThat(orders.get(1).totalSum()).isEqualTo(75L * 4);
+
+        assertThat(orders.get(2).items()).containsExactly(
+                new ItemDto(400L, "Date", "", "", 200L, 1),
+                new ItemDto(500L, "Elderberry", "", "", 120L, 5));
+        assertThat(orders.get(2).totalSum()).isEqualTo(200L + 120L * 5);
     }
 
-    @Test
-    void getOrders_whenNoOrders_returnsEmptyList() {
-        when(orderRepository.findAllWithItems()).thenReturn(List.of());
-
-        assertThat(orderService.getOrders()).isEmpty();
+    private static OrderItem orderItem(long id, long orderId, long productId, String title, long price, int quantity) {
+        OrderItem item = new OrderItem(productId, title, price, quantity);
+        item.setId(id);
+        item.setOrderId(orderId);
+        return item;
     }
 }

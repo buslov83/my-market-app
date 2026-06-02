@@ -1,18 +1,18 @@
 package ru.practicum.mymarket.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.reactive.server.WebTestClient;
 import ru.practicum.mymarket.service.CartService;
 import ru.practicum.mymarket.service.OrderService;
 import ru.practicum.mymarket.service.ProductService;
 
-@WebMvcTest
-abstract class ControllerWebMvcTestBase {
+@WebFluxTest
+abstract class ControllerTestBase {
 
     @Autowired
-    protected MockMvc mockMvc;
+    protected WebTestClient webTestClient;
 
     @MockitoBean
     protected ProductService productService;

@@ -1,173 +1,230 @@
 package ru.practicum.mymarket.controller;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.server.WebSession;
+import reactor.core.publisher.Mono;
 import ru.practicum.mymarket.dto.ItemDto;
-import ru.practicum.mymarket.dto.PagingDto;
 import ru.practicum.mymarket.dto.ProductsPageDto;
 import ru.practicum.mymarket.dto.enums.SortMode;
 
 import java.util.List;
-import java.util.Optional;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.apache.commons.lang3.StringUtils.countMatches;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-class ProductControllerTest extends ControllerWebMvcTestBase {
+class ProductControllerTest extends ControllerTestBase {
 
     @Test
-    void getRoot_rendersItemsViewWithDefaultParams() throws Exception {
+    void getRoot_rendersItemsViewWithDefaults() {
         when(productService.getProducts("", SortMode.NO, 1, 5))
-                .thenReturn(new ProductsPageDto(List.of(), false, false));
+                .thenReturn(Mono.just(new ProductsPageDto(List.of(), false, false)));
 
-        mockMvc.perform(get("/"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("items"))
-                .andExpect(model().attribute("search", ""))
-                .andExpect(model().attribute("sort", "NO"))
-                .andExpect(model().attribute("paging", new PagingDto(5, 1, false, false)))
-                .andExpect(model().attribute("items", List.of()));
+        webTestClient.get().uri("/")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(body -> assertThat(body)
+                        .contains("<title>Витрина магазина</title>")
+                        .contains("name=\"search\" value=\"\"")
+                        .contains("<option value=\"NO\" selected=\"selected\">")
+                        .contains("<option value=\"5\" selected=\"selected\">")
+                        .contains("Страница: 1")
+                        .doesNotContain("class=\"card\"")
+                        .doesNotContain("&larr;")
+                        .doesNotContain("&rarr;"));
     }
 
     @Test
-    void getItems_rendersItemsView() throws Exception {
+    void getItems_rendersItemsView() {
         when(productService.getProducts("", SortMode.NO, 1, 5))
-                .thenReturn(new ProductsPageDto(List.of(), false, false));
+                .thenReturn(Mono.just(new ProductsPageDto(List.of(), false, false)));
 
-        mockMvc.perform(get("/items"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("items"));
+        webTestClient.get().uri("/items")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(body -> assertThat(body).contains("<title>Витрина магазина</title>"));
     }
 
     @Test
-    void getItems_forwardsQueryParamsToServiceAndEchoesThem() throws Exception {
-        when(productService.getProducts("widget", SortMode.PRICE, 3, 10))
-                .thenReturn(new ProductsPageDto(List.of(), true, true));
+    void getItems_forwardsQueryParamsToServiceAndEchoesThem() {
+        ItemDto i1 = new ItemDto(1L, "A", "A", "a.jpg", 100L, 0);
+        ItemDto i2 = new ItemDto(2L, "B", "B", "b.jpg", 200L, 0);
+        when(productService.getProducts("widget", SortMode.PRICE, 4, 2))
+                .thenReturn(Mono.just(new ProductsPageDto(List.of(i1, i2), true, true)));
 
-        mockMvc.perform(get("/items")
-                        .param("search", "widget")
-                        .param("sort", "PRICE")
-                        .param("pageNumber", "3")
-                        .param("pageSize", "10"))
-                .andExpect(status().isOk())
-                .andExpect(model().attribute("search", "widget"))
-                .andExpect(model().attribute("sort", "PRICE"))
-                .andExpect(model().attribute("paging", new PagingDto(10, 3, true, true)));
+        webTestClient.get().uri(uri -> uri.path("/items")
+                        .queryParam("search", "widget")
+                        .queryParam("sort", "PRICE")
+                        .queryParam("pageNumber", "4")
+                        .queryParam("pageSize", "2")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(body -> assertThat(body)
+                        .contains("name=\"search\" value=\"widget\"")
+                        .contains("<option value=\"PRICE\" selected=\"selected\">")
+                        .contains("<option value=\"2\" selected=\"selected\">")
+                        .contains("Страница: 4")
+                        .containsSubsequence("name=\"pageNumber\" value=\"3\"", "&larr;")
+                        .containsSubsequence("name=\"pageNumber\" value=\"5\"", "&rarr;"));
     }
 
     @Test
-    void getItems_chunksItemsIntoRowsOfThree_padsLastRowWithPlaceholders() throws Exception {
-        ItemDto i1 = new ItemDto(1L, "A", "A", "a.jpg", 100L, 1);
-        ItemDto i2 = new ItemDto(2L, "B", "B", "b.jpg", 200L, 2);
-        ItemDto i3 = new ItemDto(3L, "C", "C", "c.jpg", 300L, 3);
-        ItemDto i4 = new ItemDto(4L, "D", "D", "d.jpg", 400L, 4);
-        when(productService.getProducts(any(), any(), anyInt(), anyInt()))
-                .thenReturn(new ProductsPageDto(List.of(i1, i2, i3, i4), false, false));
+    void getItems_setsItemQuantity() {
+        ItemDto i1 = new ItemDto(1L, "Alpha", "A", "a.jpg", 100L, 0);
+        ItemDto i2 = new ItemDto(2L, "Bravo", "B", "b.jpg", 200L, 0);
+        ItemDto i3 = new ItemDto(3L, "Charlie", "C", "c.jpg", 300L, 0);
+        when(cartService.quantity(eq(1L), any(WebSession.class))).thenReturn(7);
+        when(cartService.quantity(eq(2L), any(WebSession.class))).thenReturn(11);
+        when(productService.getProducts("", SortMode.NO, 1, 5))
+                .thenReturn(Mono.just(new ProductsPageDto(List.of(i1, i2, i3), false, false)));
 
-        mockMvc.perform(get("/items"))
-                .andExpect(status().isOk())
-                .andExpect(model().attribute("items", List.of(
-                        List.of(i1, i2, i3),
-                        List.of(i4, ItemDto.PLACEHOLDER, ItemDto.PLACEHOLDER)
-                )));
+        webTestClient.get().uri("/items")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(body -> assertThat(body).containsSubsequence(
+                        "Alpha", "<span>7</span>",
+                        "Bravo", "<span>11</span>",
+                        "Charlie", "<span>0</span>"));
     }
 
     @Test
-    void getProduct_foundProduct_rendersItemViewWithItemAttribute() throws Exception {
-        ItemDto dto = new ItemDto(1L, "Widget", "A widget", "img/w.jpg", 199L, 5);
-        when(productService.getProduct(1L)).thenReturn(Optional.of(dto));
+    void getItems_chunksItemsIntoRowsOfThree_padsLastRowWithPlaceholders() {
+        ItemDto i1 = new ItemDto(1L, "Alpha", "A", "a.jpg", 100L, 0);
+        ItemDto i2 = new ItemDto(2L, "Bravo", "B", "b.jpg", 200L, 0);
+        ItemDto i3 = new ItemDto(3L, "Charlie", "C", "c.jpg", 300L, 0);
+        ItemDto i4 = new ItemDto(4L, "Delta", "D", "d.jpg", 400L, 0);
+        when(productService.getProducts("", SortMode.NO, 1, 5))
+                .thenReturn(Mono.just(new ProductsPageDto(List.of(i1, i2, i3, i4), false, false)));
 
-        mockMvc.perform(get("/items/1"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("item"))
-                .andExpect(model().attribute("item", dto));
+        webTestClient.get().uri("/items")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(body -> {
+                    assertThat(body).containsSubsequence("Alpha", "Bravo", "Charlie", "Delta", "&nbsp;", "&nbsp;");
+                    assertThat(countMatches(body, "&nbsp;")).isEqualTo(2);
+                });
     }
 
     @Test
-    void getProduct_notFound_returns404() throws Exception {
-        when(productService.getProduct(999L)).thenReturn(Optional.empty());
-
-        mockMvc.perform(get("/items/999"))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void postItems_plusAction_incrementsCartAndRedirects() throws Exception {
-        mockMvc.perform(post("/items")
-                        .param("id", "42")
-                        .param("action", "PLUS"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/items"));
-
-        verify(cartService).plus(42L);
-        verifyNoMoreInteractions(cartService);
-    }
-
-    @Test
-    void postItems_minusAction_decrementsCart() throws Exception {
-        mockMvc.perform(post("/items")
-                        .param("id", "42")
-                        .param("action", "MINUS"))
-                .andExpect(status().is3xxRedirection());
-
-        verify(cartService).minus(42L);
-        verifyNoMoreInteractions(cartService);
-    }
-
-    @Test
-    void postItems_redirectEchoesQueryParams() throws Exception {
-        mockMvc.perform(post("/items")
-                        .param("id", "7")
-                        .param("action", "PLUS")
-                        .param("search", "widget")
-                        .param("sort", "")
-                        .param("pageNumber", "3")
-                        .param("pageSize", "10"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/items?search=widget&sort=&pageNumber=3&pageSize=10"));
-    }
-
-    @Test
-    void postProduct_plusAction_incrementsCartAndRendersItemView() throws Exception {
-        ItemDto dto = new ItemDto(1L, "Widget", "A widget", "img/w.jpg", 199L, 1);
-        when(productService.getProduct(1L)).thenReturn(Optional.of(dto));
-
-        mockMvc.perform(post("/items/1")
-                        .param("action", "PLUS"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("item"))
-                .andExpect(model().attribute("item", dto));
-
-        verify(cartService).plus(1L);
-        verifyNoMoreInteractions(cartService);
-    }
-
-    @Test
-    void postProduct_minusAction_decrementsCart() throws Exception {
+    void getProduct_found_rendersItemView() {
         ItemDto dto = new ItemDto(1L, "Widget", "A widget", "img/w.jpg", 199L, 0);
-        when(productService.getProduct(1L)).thenReturn(Optional.of(dto));
+        when(productService.getProduct(1L)).thenReturn(Mono.just(dto));
+        when(cartService.quantity(eq(1L), any(WebSession.class))).thenReturn(5);
 
-        mockMvc.perform(post("/items/1")
-                        .param("action", "MINUS"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("item"));
+        webTestClient.get().uri("/items/1")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(body -> assertThat(body).containsSubsequence("Widget", "<span>5</span>"));
+    }
 
-        verify(cartService).minus(1L);
+    @Test
+    void getProduct_notFound_returns404() {
+        when(productService.getProduct(999L)).thenReturn(Mono.empty());
+
+        webTestClient.get().uri("/items/999")
+                .exchange()
+                .expectStatus().isNotFound();
+    }
+
+    @Test
+    void postItems_plus_incrementsCartAndRedirects() {
+        when(cartService.plus(anyLong(), any(WebSession.class))).thenReturn(Mono.empty());
+
+        webTestClient.post().uri("/items")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(BodyInserters.fromFormData("id", "42").with("action", "PLUS"))
+                .exchange()
+                .expectStatus().is3xxRedirection()
+                .expectHeader().valueEquals("Location", "/items");
+
+        verify(cartService).plus(eq(42L), any(WebSession.class));
         verifyNoMoreInteractions(cartService);
     }
 
     @Test
-    void postProduct_notFound_returns404() throws Exception {
-        when(productService.getProduct(999L)).thenReturn(Optional.empty());
+    void postItems_minus_decrementsCartAndRedirects() {
+        when(cartService.minus(anyLong(), any(WebSession.class))).thenReturn(Mono.empty());
 
-        mockMvc.perform(post("/items/999")
-                        .param("action", "PLUS"))
-                .andExpect(status().isNotFound());
+        webTestClient.post().uri("/items")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(BodyInserters.fromFormData("id", "42").with("action", "MINUS"))
+                .exchange()
+                .expectStatus().is3xxRedirection();
 
-        verify(cartService).plus(999L);
+        verify(cartService).minus(eq(42L), any(WebSession.class));
+        verifyNoMoreInteractions(cartService);
+    }
+
+    @Test
+    void postItems_redirectEchoesQueryParams() {
+        when(cartService.plus(anyLong(), any(WebSession.class))).thenReturn(Mono.empty());
+
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("id", "7");
+        form.add("action", "PLUS");
+        form.add("search", "widget");
+        form.add("sort", "");
+        form.add("pageNumber", "3");
+        form.add("pageSize", "10");
+
+        webTestClient.post().uri("/items")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(BodyInserters.fromFormData(form))
+                .exchange()
+                .expectStatus().is3xxRedirection()
+                .expectHeader().valueEquals("Location",
+                        "/items?search=widget&sort=&pageNumber=3&pageSize=10");
+    }
+
+    @Test
+    void postProduct_plus_incrementsCartAndRendersItemView() {
+        ItemDto dto = new ItemDto(1L, "Widget", "A widget", "img/w.jpg", 199L, 0);
+        when(productService.getProduct(1L)).thenReturn(Mono.just(dto));
+        when(cartService.quantity(anyLong(), any(WebSession.class))).thenReturn(5);
+        when(cartService.plus(anyLong(), any(WebSession.class))).thenReturn(Mono.empty());
+
+        webTestClient.post().uri("/items/1")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(BodyInserters.fromFormData("action", "PLUS"))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(body -> assertThat(body).containsSubsequence("Widget", "<span>5</span>"));
+
+        verify(cartService).quantity(eq(1L), any(WebSession.class));
+        verify(cartService).plus(eq(1L), any(WebSession.class));
+        verifyNoMoreInteractions(cartService);
+    }
+
+    @Test
+    void postProduct_minus_decrementsCartAndRendersItemView() {
+        ItemDto dto = new ItemDto(1L, "Widget", "A widget", "img/w.jpg", 199L, 0);
+        when(productService.getProduct(1L)).thenReturn(Mono.just(dto));
+        when(cartService.quantity(anyLong(), any(WebSession.class))).thenReturn(5);
+        when(cartService.minus(anyLong(), any(WebSession.class))).thenReturn(Mono.empty());
+
+        webTestClient.post().uri("/items/1")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(BodyInserters.fromFormData("action", "MINUS"))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(body -> assertThat(body).containsSubsequence("Widget", "<span>5</span>"));
+
+        verify(cartService).quantity(eq(1L), any(WebSession.class));
+        verify(cartService).minus(eq(1L), any(WebSession.class));
         verifyNoMoreInteractions(cartService);
     }
 }

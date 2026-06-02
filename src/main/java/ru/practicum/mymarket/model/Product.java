@@ -1,27 +1,25 @@
 package ru.practicum.mymarket.model;
 
-import jakarta.persistence.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "products")
+@Table("products")
 public class Product {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
     private String title;
 
-    @Column(length = 2000)
     private String description;
 
+    @Column("img_path")
     private String imgPath;
 
-    @Column(nullable = false)
     private long price;
 
-    @Column(name = "external_id", unique = true)
+    @Column("external_id")
     private String externalId;
 
     public Product() {

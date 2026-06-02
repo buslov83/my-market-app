@@ -1,79 +1,91 @@
 package ru.practicum.mymarket.controller;
 
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Mono;
 import ru.practicum.mymarket.dto.ItemDto;
 import ru.practicum.mymarket.dto.OrderDto;
 
 import java.util.List;
-import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-class OrderControllerTest extends ControllerWebMvcTestBase {
+class OrderControllerTest extends ControllerTestBase {
 
     @Test
-    void postBuy_redirectsToNewOrderPage() throws Exception {
-        when(orderService.checkout()).thenReturn(42L);
+    void getOrder_rendersOrderViewWithItemsAndTotal() {
+        OrderDto dto = new OrderDto(7L,
+                List.of(new ItemDto(1L, "Widget", "", "", 100L, 2),
+                        new ItemDto(2L, "Gadget", "", "", 250L, 1)),
+                450L);
+        when(orderService.getOrder(7L)).thenReturn(Mono.just(dto));
 
-        mockMvc.perform(post("/buy"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/orders/42?newOrder=true"));
+        webTestClient.get().uri("/orders/7")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(body -> assertThat(body)
+                        .doesNotContain("Поздравляем! Успешная покупка!")
+                        .contains("Заказ №7")
+                        .containsSubsequence("Widget", "2 шт.", "100 руб.", "Сумма: 200 руб.",
+                                "Gadget", "1 шт.", "250 руб.", "Сумма: 250 руб.")
+                        .contains("Сумма: 450 руб."));
     }
 
     @Test
-    void getOrder_rendersOrderViewWithNewOrderTrue() throws Exception {
-        OrderDto dto = new OrderDto(7L, List.of(new ItemDto(1L, "Apple", "", "", 100L, 2)), 200L);
-        when(orderService.getOrder(7L)).thenReturn(Optional.of(dto));
+    void getOrder_newOrderTrue_showsCongratulationBanner() {
+        OrderDto dto = new OrderDto(7L,
+                List.of(new ItemDto(1L, "Widget", "", "", 100L, 2)),
+                200L);
+        when(orderService.getOrder(7L)).thenReturn(Mono.just(dto));
 
-        mockMvc.perform(get("/orders/7").param("newOrder", "true"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("order"))
-                .andExpect(model().attribute("order", dto))
-                .andExpect(model().attribute("newOrder", true));
+        webTestClient.get().uri("/orders/7?newOrder=true")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(body -> assertThat(body).contains("Поздравляем! Успешная покупка!"));
     }
 
     @Test
-    void getOrder_defaultsNewOrderToFalse() throws Exception {
-        OrderDto dto = new OrderDto(7L, List.of(new ItemDto(1L, "Apple", "", "", 100L, 2)), 200L);
-        when(orderService.getOrder(7L)).thenReturn(Optional.of(dto));
+    void getOrder_whenServiceReturnsEmptyMono_returns404() {
+        when(orderService.getOrder(99L)).thenReturn(Mono.empty());
 
-        mockMvc.perform(get("/orders/7"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("order"))
-                .andExpect(model().attribute("order", dto))
-                .andExpect(model().attribute("newOrder", false));
+        webTestClient.get().uri("/orders/99")
+                .exchange()
+                .expectStatus().isNotFound();
     }
 
     @Test
-    void getOrder_whenServiceReturnsEmpty_returns404() throws Exception {
-        when(orderService.getOrder(99L)).thenReturn(Optional.empty());
+    void getOrders_rendersOrdersViewWithOrders() {
+        OrderDto first = new OrderDto(1L,
+                List.of(new ItemDto(10L, "Widget", "", "", 100L, 2)),
+                200L);
+        OrderDto second = new OrderDto(2L,
+                List.of(new ItemDto(20L, "Gadget", "", "", 250L, 1),
+                        new ItemDto(21L, "Sparkler", "", "", 50L, 4)),
+                450L);
+        when(orderService.getOrders()).thenReturn(Mono.just(List.of(first, second)));
 
-        mockMvc.perform(get("/orders/99"))
-                .andExpect(status().isNotFound());
+        webTestClient.get().uri("/orders")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(body -> assertThat(body)
+                        .containsSubsequence("Заказ №1", "Widget (2 шт.) 200 руб.", "Сумма: 200 руб.",
+                                "Заказ №2", "Gadget (1 шт.) 250 руб.", "Sparkler (4 шт.) 200 руб.",
+                                "Сумма: 450 руб."));
     }
 
     @Test
-    void getOrders_rendersOrdersViewWithList() throws Exception {
-        OrderDto first = new OrderDto(1L, List.of(new ItemDto(1L, "Apple", "", "", 100L, 2)), 200L);
-        OrderDto second = new OrderDto(2L, List.of(new ItemDto(3L, "Carrot", "", "", 50L, 1)), 50L);
-        when(orderService.getOrders()).thenReturn(List.of(first, second));
+    void getOrders_empty_rendersEmptyOrdersView() {
+        when(orderService.getOrders()).thenReturn(Mono.just(List.of()));
 
-        mockMvc.perform(get("/orders"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("orders"))
-                .andExpect(model().attribute("orders", List.of(first, second)));
-    }
-
-    @Test
-    void getOrders_whenNoOrders_rendersEmptyList() throws Exception {
-        when(orderService.getOrders()).thenReturn(List.of());
-
-        mockMvc.perform(get("/orders"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("orders"))
-                .andExpect(model().attribute("orders", List.of()));
+        webTestClient.get().uri("/orders")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(body -> assertThat(body)
+                        .contains("Витрина магазина")
+                        .doesNotContain("Заказ №"));
     }
 }

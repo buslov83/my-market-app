@@ -5,11 +5,11 @@ A server-side rendered marketplace web application: a product showcase with sear
 ## Tech stack
 
 - Java 21
-- Spring Boot 3.5 (servlet stack), Spring Web MVC
+- Spring Boot 3.5 (reactive stack), Spring WebFlux
 - Thymeleaf
-- Spring Data JPA / Hibernate
+- Spring Data R2DBC
 - PostgreSQL (runtime), H2 (tests)
-- Liquibase for database migrations
+  - DDL managed via Spring Boot SQL init (`src/main/resources/schema.sql`)
 - Maven (Maven Wrapper included)
 - JUnit 5 / Spring Boot Test
 - Docker, Docker Compose
@@ -64,7 +64,7 @@ To run the application against a local Postgres instance:
    ```
 3. Open http://localhost:8080 in your browser.
 
-Alternatively, the application can be run without using the `dev` profile by supplying the DB connection details directly through environment variables. For the same Postgres instance started with `docker-compose.dev.yml`:
+Alternatively, the application can be run without using the `dev` profile by supplying the DB connection params directly through environment variables. For the same Postgres instance started with `docker-compose.dev.yml`:
 
 ```bash
 DB_HOST=localhost DB_PORT=5432 DB_NAME=marketdb \
